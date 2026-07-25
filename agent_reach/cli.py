@@ -146,7 +146,12 @@ def main():
     p_tr = sub.add_parser("transcribe", help="Transcribe a URL or local audio file (Whisper via Groq/OpenAI)")
     p_tr.add_argument("source", help="Audio/video URL or local file path")
     p_tr.add_argument("--provider", choices=["auto", "groq", "openai"], default="auto",
-                      help="Transcription provider (default: auto = groq → openai fallback)")
+                      help="Transcription provider (default: first configured provider)")
+    p_tr.add_argument(
+        "--allow-provider-fallback",
+        action="store_true",
+        help="On provider failure, allow sending audio to the next configured provider",
+    )
     p_tr.add_argument("-o", "--output", default=None,
                       help="Write transcript to a file instead of stdout")
 
@@ -1321,14 +1326,22 @@ def _cmd_configure(args):
 
 
 def _cmd_transcribe(args):
-    """Transcribe a URL or local audio file via Whisper (Groq → OpenAI fallback)."""
+    """Transcribe a URL or local audio file via an explicitly selected provider."""
     from pathlib import Path
 
     from agent_reach.transcribe import TranscribeError, transcribe
     from agent_reach.utils.text import scrub_url_credentials
 
     try:
-        text = transcribe(args.source, provider=args.provider)
+        text = transcribe(
+            args.source,
+            provider=args.provider,
+            allow_provider_fallback=getattr(
+                args,
+                "allow_provider_fallback",
+                False,
+            ),
+        )
     except TranscribeError as e:
         print(f"❌ {scrub_url_credentials(e)}")
         sys.exit(1)

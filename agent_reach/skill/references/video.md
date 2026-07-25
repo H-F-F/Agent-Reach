@@ -49,7 +49,8 @@ agent-reach transcribe ./local_audio.mp3 -o /tmp/transcript.txt
 
 > `agent-reach transcribe` 只接收公开 http(s) URL 或本地音频文件。用 `ytsearch5:` 搜索时，先从 yt-dlp 结果里选出具体视频 URL，再转写。
 > 需要先配置 key：`agent-reach configure groq-key gsk_xxx`（免费，console.groq.com）
-> 或 `agent-reach configure openai-key sk-xxx`。默认 auto 模式：groq 失败自动降级 openai。
+> 或 `agent-reach configure openai-key sk-xxx`。默认 auto 模式只使用第一个已配置服务商；
+> 如明确同意失败后把音频发给下一家，可加 `--allow-provider-fallback`。
 
 ## B站 / Bilibili（bili-cli 为主，OpenCLI 补字幕）
 

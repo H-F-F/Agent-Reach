@@ -103,6 +103,28 @@ class TestCLI:
         assert out_file.read_text(encoding="utf-8").strip() == "saved text"
         assert "Transcript written" in capsys.readouterr().out
 
+    def test_transcribe_provider_fallback_requires_explicit_flag(self):
+        with patch(
+            "agent_reach.transcribe.transcribe",
+            return_value="hello transcript",
+        ) as mock_transcribe:
+            with patch(
+                "sys.argv",
+                [
+                    "agent-reach",
+                    "transcribe",
+                    "audio.mp3",
+                    "--allow-provider-fallback",
+                ],
+            ):
+                main()
+
+        mock_transcribe.assert_called_once_with(
+            "audio.mp3",
+            provider="auto",
+            allow_provider_fallback=True,
+        )
+
     def test_parse_twitter_cookie_input_separate_values(self):
         auth_token, ct0 = cli._parse_twitter_cookie_input("token123 ct0abc")
         assert auth_token == "token123"

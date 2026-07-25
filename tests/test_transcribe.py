@@ -168,6 +168,74 @@ class TestFallback:
 
 
 class TestOrchestrator:
+    def test_auto_does_not_send_audio_to_second_provider_without_consent(
+        self,
+        monkeypatch,
+        fake_config,
+        tmp_path,
+        chunk_file,
+        bounded_audio_duration,
+    ):
+        fake_config.set("groq_api_key", "gsk_test")
+        fake_config.set("openai_api_key", "sk-test")
+        compressed = tmp_path / "compressed.m4a"
+        compressed.write_bytes(b"compressed")
+        monkeypatch.setattr(tr, "compress_audio", lambda *_args: compressed)
+        calls: List[str] = []
+
+        def fake_post(url, **_kwargs):
+            calls.append(url)
+            if url == tr.PROVIDERS["groq"]["endpoint"]:
+                return FakeResponse(429, "rate limited")
+            return FakeResponse(200, "from-openai")
+
+        monkeypatch.setattr(tr.requests, "post", fake_post)
+
+        with pytest.raises(tr.TranscribeError, match="groq.*HTTP 429"):
+            tr.transcribe(
+                str(chunk_file),
+                out_dir=tmp_path / "work",
+                config=fake_config,
+            )
+
+        assert calls == [tr.PROVIDERS["groq"]["endpoint"]]
+
+    def test_auto_falls_back_only_with_explicit_consent(
+        self,
+        monkeypatch,
+        fake_config,
+        tmp_path,
+        chunk_file,
+        bounded_audio_duration,
+    ):
+        fake_config.set("groq_api_key", "gsk_test")
+        fake_config.set("openai_api_key", "sk-test")
+        compressed = tmp_path / "compressed.m4a"
+        compressed.write_bytes(b"compressed")
+        monkeypatch.setattr(tr, "compress_audio", lambda *_args: compressed)
+        calls: List[str] = []
+
+        def fake_post(url, **_kwargs):
+            calls.append(url)
+            if url == tr.PROVIDERS["groq"]["endpoint"]:
+                return FakeResponse(429, "rate limited")
+            return FakeResponse(200, "from-openai")
+
+        monkeypatch.setattr(tr.requests, "post", fake_post)
+
+        text = tr.transcribe(
+            str(chunk_file),
+            out_dir=tmp_path / "work",
+            config=fake_config,
+            allow_provider_fallback=True,
+        )
+
+        assert text == "from-openai"
+        assert calls == [
+            tr.PROVIDERS["groq"]["endpoint"],
+            tr.PROVIDERS["openai"]["endpoint"],
+        ]
+
     def test_rejects_overlong_audio_before_compression(
         self, monkeypatch, fake_config, chunk_file
     ):
@@ -648,20 +716,32 @@ class TestYouTubeChannelTranscribe:
 
         captured = {}
 
-        def fake_transcribe(source, *, provider="auto", out_dir=None, config=None):
+        def fake_transcribe(
+            source,
+            *,
+            provider="auto",
+            out_dir=None,
+            config=None,
+            allow_provider_fallback=False,
+        ):
             captured["source"] = source
             captured["provider"] = provider
             captured["config"] = config
+            captured["allow_provider_fallback"] = allow_provider_fallback
             return "delegated text"
 
         monkeypatch.setattr(tr, "transcribe", fake_transcribe)
         out = YouTubeChannel().transcribe(
-            "https://youtu.be/abc", provider="groq", config=fake_config
+            "https://youtu.be/abc",
+            provider="groq",
+            config=fake_config,
+            allow_provider_fallback=True,
         )
         assert out == "delegated text"
         assert captured["source"] == "https://youtu.be/abc"
         assert captured["provider"] == "groq"
         assert captured["config"] is fake_config
+        assert captured["allow_provider_fallback"] is True
 
 
 # --- Config feature requirement --------------------------------------- #

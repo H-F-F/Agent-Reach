@@ -114,10 +114,17 @@ class YouTubeChannel(Channel):
                         + "）"
                     )
                 else:
-                    msg += f"，可转写音频（{'→'.join(providers)}）"
+                    msg += f"，可转写音频（{'/'.join(providers)}）"
         return "ok", msg
 
-    def transcribe(self, url: str, *, provider: str = "auto", config=None) -> str:
+    def transcribe(
+        self,
+        url: str,
+        *,
+        provider: str = "auto",
+        config=None,
+        allow_provider_fallback: bool = False,
+    ) -> str:
         """Download a YouTube video's audio and return its transcript.
 
         Delegates to :func:`agent_reach.transcribe.transcribe`. Imported lazily
@@ -126,4 +133,9 @@ class YouTubeChannel(Channel):
         """
         from agent_reach.transcribe import transcribe as _transcribe
 
-        return _transcribe(url, provider=provider, config=config)
+        return _transcribe(
+            url,
+            provider=provider,
+            config=config,
+            allow_provider_fallback=allow_provider_fallback,
+        )

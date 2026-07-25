@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Whisper audio transcription with Groq → OpenAI fallback.
+"""Whisper audio transcription with explicit provider routing.
 
 Downloads audio (yt-dlp), compresses + chunks (ffmpeg), and posts to a
-Whisper-compatible API. Defaults to Groq's free `whisper-large-v3` and falls
-back to OpenAI's `whisper-1` on HTTP error.
+Whisper-compatible API. Auto mode selects the first configured provider and
+only sends audio to another provider when the caller explicitly opts in.
 
 Public entry point:
-    transcribe(source, *, provider="auto", out_dir=None, config=None) -> str
+    transcribe(
+        source,
+        *,
+        provider="auto",
+        out_dir=None,
+        config=None,
+        allow_provider_fallback=False,
+    ) -> str
 
 Designed to be importable from channels (e.g. YouTubeChannel.transcribe).
 """
@@ -360,19 +367,28 @@ def transcribe(
     provider: str = "auto",
     out_dir: Optional[Path] = None,
     config: Optional[Config] = None,
+    allow_provider_fallback: bool = False,
 ) -> str:
     """Transcribe a URL or local file path. Returns the joined transcript text.
 
-    `provider` is one of `auto` (groq → openai), `groq`, or `openai`.
+    `provider` is one of `auto`, `groq`, or `openai`. Auto mode selects the
+    first configured provider (Groq, then OpenAI). Set
+    `allow_provider_fallback=True` to permit sending failed chunks to the next
+    configured provider.
     `out_dir` defaults to a fresh temp directory; intermediate files stay there.
     """
     cfg = config or Config()
-    order = _provider_order(provider)
+    candidates = _provider_order(provider)
+    configured = [p for p in candidates if _provider_key(p, cfg)]
 
     # Validate at least one provider is configured before doing expensive work.
-    if not any(_provider_key(p, cfg) for p in order):
-        names = ", ".join(PROVIDERS[p]["key_field"] for p in order)
+    if not configured:
+        names = ", ".join(PROVIDERS[p]["key_field"] for p in candidates)
         raise NoProviderConfigured(f"no provider key configured (need one of: {names})")
+
+    order = configured
+    if provider == "auto" and not allow_provider_fallback:
+        order = configured[:1]
 
     if out_dir:
         return _transcribe_in_dir(source, order, cfg, Path(out_dir))
