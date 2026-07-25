@@ -11,13 +11,127 @@ channel coverage after rss (#360), github (#361), web (#363),
 reddit (#364) and xueqiu (#365).
 """
 
+import subprocess
 from unittest.mock import patch
+
+import pytest
+import requests
 
 from agent_reach.channels import v2ex as v2
 from agent_reach.channels.v2ex import V2EXChannel
 
-
 # --- can_handle ---
+
+
+class _FakeResponse:
+    def __init__(self, chunks):
+        self.chunks = chunks
+        self.closed = False
+
+    def raise_for_status(self):
+        return None
+
+    def iter_content(self, chunk_size):
+        assert chunk_size == 64 * 1024
+        yield from self.chunks
+
+    def close(self):
+        self.closed = True
+
+
+def test_get_json_streams_and_closes_bounded_response(monkeypatch):
+    response = _FakeResponse([b'[{"id":', b" 1}]"])
+    captured = {}
+
+    def fake_get(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return response
+
+    monkeypatch.setattr(v2.requests, "get", fake_get)
+
+    assert v2._get_json("https://www.v2ex.com/api/topics/hot.json") == [
+        {"id": 1}
+    ]
+    assert captured["stream"] is True
+    assert captured["timeout"] == v2._TIMEOUT
+    assert response.closed is True
+
+
+def test_get_json_falls_back_to_resolved_curl_only_for_tls_errors(monkeypatch):
+    curl_path = r"C:\Windows\System32\curl.exe"
+    calls = []
+
+    monkeypatch.setattr(
+        v2.requests,
+        "get",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            requests.exceptions.SSLError("unexpected EOF")
+        ),
+    )
+    monkeypatch.setattr(v2.shutil, "which", lambda name: curl_path)
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=b'[{"id": 1}]',
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(v2.subprocess, "run", fake_run)
+
+    assert v2._get_json("https://www.v2ex.com/api/topics/hot.json") == [
+        {"id": 1}
+    ]
+    assert calls[0][0][0] == curl_path
+    assert "--max-filesize" in calls[0][0]
+    assert calls[0][1]["timeout"] > v2._TIMEOUT
+
+
+def test_get_json_falls_back_when_tls_fails_while_streaming(monkeypatch):
+    curl_path = "/usr/bin/curl"
+
+    class StreamingTlsFailure(_FakeResponse):
+        def iter_content(self, chunk_size):
+            raise requests.exceptions.SSLError("unexpected EOF")
+            yield b""  # pragma: no cover
+
+    response = StreamingTlsFailure([])
+    monkeypatch.setattr(v2.requests, "get", lambda *_args, **_kwargs: response)
+    monkeypatch.setattr(v2.shutil, "which", lambda _name: curl_path)
+    monkeypatch.setattr(
+        v2.subprocess,
+        "run",
+        lambda args, **_kwargs: subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=b'{"ok": true}',
+            stderr=b"",
+        ),
+    )
+
+    assert v2._get_json("https://www.v2ex.com/api/topics/hot.json") == {
+        "ok": True
+    }
+    assert response.closed is True
+
+
+def test_get_json_never_falls_back_for_non_tls_http_errors(monkeypatch):
+    def fail_http(*_args, **_kwargs):
+        raise requests.exceptions.HTTPError("HTTP 503")
+
+    monkeypatch.setattr(v2.requests, "get", fail_http)
+    monkeypatch.setattr(
+        v2.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail(
+            "curl fallback must be limited to TLS failures"
+        ),
+    )
+
+    with pytest.raises(requests.exceptions.HTTPError, match="503"):
+        v2._get_json("https://www.v2ex.com/api/topics/hot.json")
 
 def test_can_handle_matches_v2ex_hosts():
     ch = V2EXChannel()

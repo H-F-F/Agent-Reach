@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import os
+import shutil
 from collections.abc import Mapping
 
 UTF8_ENV = {
     "PYTHONUTF8": "1",
     "PYTHONIOENCODING": "utf-8",
 }
+
+
+def resolve_command(command: str) -> str:
+    """Return the exact executable path when PATH resolution can find it.
+
+    Windows npm tools are commonly ``.CMD`` shims. Passing the resolved path
+    to ``subprocess`` works consistently across Windows, macOS, and Linux.
+    The original name is retained so callers still get the usual
+    ``FileNotFoundError`` when a command disappears after a prior check.
+    """
+    return shutil.which(command) or command
 
 
 def utf8_subprocess_env(base: Mapping[str, str] | None = None) -> dict[str, str]:

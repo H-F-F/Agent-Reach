@@ -705,16 +705,17 @@ def test_mcporter_install_adds_exa_to_home_scope(monkeypatch):
     import shutil
 
     calls = []
+    mcporter_path = r"C:\Users\neo\AppData\Roaming\npm\mcporter.CMD"
 
     monkeypatch.setattr(
         shutil,
         "which",
-        lambda name: "/usr/bin/mcporter" if name == "mcporter" else None,
+        lambda name: mcporter_path if name == "mcporter" else None,
     )
 
     def fake_run(args, **_kwargs):
         calls.append(args)
-        if args == ["mcporter", "config", "list", "--json"]:
+        if args == [mcporter_path, "config", "list", "--json"]:
             return _docker_result(args, stdout='{"servers": []}')
         return _docker_result(args)
 
@@ -723,7 +724,7 @@ def test_mcporter_install_adds_exa_to_home_scope(monkeypatch):
     cli._install_mcporter()
 
     assert [
-        "mcporter",
+        mcporter_path,
         "config",
         "add",
         "exa",
@@ -731,7 +732,7 @@ def test_mcporter_install_adds_exa_to_home_scope(monkeypatch):
         "--scope",
         "home",
     ] in calls
-    assert ["mcporter", "config", "list", "--json"] in calls
+    assert [mcporter_path, "config", "list", "--json"] in calls
 
 
 def test_mcporter_install_does_not_treat_metadata_as_exa_server(
@@ -742,6 +743,7 @@ def test_mcporter_install_does_not_treat_metadata_as_exa_server(
     import shutil
 
     calls = []
+    mcporter_path = "/usr/bin/mcporter"
     payload = {
         "servers": [
             {
@@ -755,12 +757,12 @@ def test_mcporter_install_does_not_treat_metadata_as_exa_server(
     monkeypatch.setattr(
         shutil,
         "which",
-        lambda name: "/usr/bin/mcporter" if name == "mcporter" else None,
+        lambda name: mcporter_path if name == "mcporter" else None,
     )
 
     def fake_run(args, **_kwargs):
         calls.append(args)
-        if args == ["mcporter", "config", "list", "--json"]:
+        if args == [mcporter_path, "config", "list", "--json"]:
             return _docker_result(args, stdout=json.dumps(payload))
         return _docker_result(args)
 
@@ -769,7 +771,7 @@ def test_mcporter_install_does_not_treat_metadata_as_exa_server(
     cli._install_mcporter()
 
     assert [
-        "mcporter",
+        mcporter_path,
         "config",
         "add",
         "exa",

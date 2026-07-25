@@ -188,7 +188,9 @@ class TestCLI:
         cli._install_rdt_cli()
 
         out = capsys.readouterr().out
-        assert commands == [["pipx", "install", cli._RDT_GIT_SOURCE]]
+        assert commands == [
+            ["/usr/local/bin/pipx", "install", cli._RDT_GIT_SOURCE]
+        ]
         assert "✅ rdt-cli installed" in out
 
     def test_install_reddit_deps_routes_by_environment(self, monkeypatch):

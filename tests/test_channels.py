@@ -10,6 +10,7 @@ import pytest
 
 from agent_reach.backends import OpenCLIStatus
 from agent_reach.channels import get_all_channels, get_channel
+from agent_reach.channels import v2ex as v2ex_mod
 from agent_reach.channels.bilibili import BilibiliChannel
 from agent_reach.channels.facebook import FacebookChannel
 from agent_reach.channels.instagram import InstagramChannel
@@ -116,36 +117,16 @@ class TestV2EXChannel:
         assert not ch.can_handle("https://reddit.com/r/Python")
 
     def test_check_ok_when_api_reachable(self, monkeypatch):
-        import urllib.request
-
-        class FakeResponse:
-            status = 200
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
-            def read(self):
-                return b"[]"
-
-        monkeypatch.setattr(
-            urllib.request,
-            "urlopen",
-            lambda req, timeout=None: FakeResponse(),
-        )
+        monkeypatch.setattr(v2ex_mod, "_get_json", lambda _url: [])
         status, msg = V2EXChannel().check()
         assert status == "ok"
         assert "公开 API 可用" in msg
 
     def test_check_warn_when_api_unreachable(self, monkeypatch):
-        import urllib.request
-
-        def raise_error(req, timeout=None):
+        def raise_error(_url):
             raise URLError("connection refused")
 
-        monkeypatch.setattr(urllib.request, "urlopen", raise_error)
+        monkeypatch.setattr(v2ex_mod, "_get_json", raise_error)
         status, msg = V2EXChannel().check()
         assert status == "warn"
         assert "失败" in msg
@@ -195,8 +176,6 @@ class TestV2EXChannel:
     # ------------------------------------------------------------------ #
 
     def test_get_hot_topics_returns_list(self, monkeypatch):
-        import urllib.request
-
         fake_data = [
             {
                 "id": 111,
@@ -218,19 +197,7 @@ class TestV2EXChannel:
             },
         ]
 
-        class FakeResponse:
-            status = 200
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *_):
-                pass
-
-            def read(self):
-                return json.dumps(fake_data).encode()
-
-        monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: FakeResponse())
+        monkeypatch.setattr(v2ex_mod, "_get_json", lambda _url: fake_data)
         topics = V2EXChannel().get_hot_topics(limit=5)
         assert len(topics) == 2
         assert topics[0]["id"] == 111
@@ -241,38 +208,24 @@ class TestV2EXChannel:
         assert topics[0]["created"] == 1700000000
 
     def test_get_hot_topics_respects_limit(self, monkeypatch):
-        import urllib.request
-
         fake_data = [
             {"id": i, "title": f"Topic {i}", "url": f"https://v2ex.com/t/{i}", "replies": i,
              "content": "", "created": 1700000000 + i, "node": {"name": "tech", "title": "Tech"}}
             for i in range(10)
         ]
 
-        class FakeResponse:
-            def __enter__(self): return self
-            def __exit__(self, *_): pass
-            def read(self): return json.dumps(fake_data).encode()
-
-        monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: FakeResponse())
+        monkeypatch.setattr(v2ex_mod, "_get_json", lambda _url: fake_data)
         topics = V2EXChannel().get_hot_topics(limit=3)
         assert len(topics) == 3
 
     def test_get_hot_topics_truncates_content(self, monkeypatch):
-        import urllib.request
-
         long_content = "A" * 300
         fake_data = [
             {"id": 1, "title": "Long post", "url": "https://v2ex.com/t/1", "replies": 0,
              "content": long_content, "created": 1700000000, "node": {"name": "tech", "title": "Tech"}}
         ]
 
-        class FakeResponse:
-            def __enter__(self): return self
-            def __exit__(self, *_): pass
-            def read(self): return json.dumps(fake_data).encode()
-
-        monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: FakeResponse())
+        monkeypatch.setattr(v2ex_mod, "_get_json", lambda _url: fake_data)
         topics = V2EXChannel().get_hot_topics(limit=1)
         assert len(topics[0]["content"]) == 200
 
@@ -281,8 +234,6 @@ class TestV2EXChannel:
     # ------------------------------------------------------------------ #
 
     def test_get_node_topics(self, monkeypatch):
-        import urllib.request
-
         fake_data = [
             {
                 "id": 333,
@@ -295,12 +246,7 @@ class TestV2EXChannel:
             }
         ]
 
-        class FakeResponse:
-            def __enter__(self): return self
-            def __exit__(self, *_): pass
-            def read(self): return json.dumps(fake_data).encode()
-
-        monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: FakeResponse())
+        monkeypatch.setattr(v2ex_mod, "_get_json", lambda _url: fake_data)
         topics = V2EXChannel().get_node_topics("python")
         assert len(topics) == 1
         assert topics[0]["id"] == 333
@@ -313,8 +259,6 @@ class TestV2EXChannel:
     # ------------------------------------------------------------------ #
 
     def test_get_topic_returns_detail_and_replies(self, monkeypatch):
-        import urllib.request
-
         topic_data = [
             {
                 "id": 999,
@@ -340,21 +284,12 @@ class TestV2EXChannel:
             },
         ]
 
-        class FakeResponse:
-            def __init__(self, payload):
-                self._payload = payload
-
-            def __enter__(self): return self
-            def __exit__(self, *_): pass
-            def read(self): return json.dumps(self._payload).encode()
-
-        def fake_urlopen(req, timeout=None):
-            url = req.full_url
+        def fake_get_json(url):
             if "replies" in url:
-                return FakeResponse(replies_data)
-            return FakeResponse(topic_data)
+                return replies_data
+            return topic_data
 
-        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(v2ex_mod, "_get_json", fake_get_json)
         result = V2EXChannel().get_topic(999)
 
         assert result["id"] == 999
@@ -366,8 +301,6 @@ class TestV2EXChannel:
         assert result["replies"][1]["content"] == "第二条回复"
 
     def test_get_topic_handles_empty_replies(self, monkeypatch):
-        import urllib.request
-
         topic_data = [
             {
                 "id": 1,
@@ -381,18 +314,12 @@ class TestV2EXChannel:
             }
         ]
 
-        class FakeResponse:
-            def __init__(self, payload): self._payload = payload
-            def __enter__(self): return self
-            def __exit__(self, *_): pass
-            def read(self): return json.dumps(self._payload).encode()
+        def fake_get_json(url):
+            if "replies" in url:
+                return []
+            return topic_data
 
-        def fake_urlopen(req, timeout=None):
-            if "replies" in req.full_url:
-                return FakeResponse([])
-            return FakeResponse(topic_data)
-
-        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(v2ex_mod, "_get_json", fake_get_json)
         result = V2EXChannel().get_topic(1)
         assert result["replies"] == []
 
@@ -401,8 +328,6 @@ class TestV2EXChannel:
     # ------------------------------------------------------------------ #
 
     def test_get_user_returns_profile(self, monkeypatch):
-        import urllib.request
-
         fake_user = {
             "id": 42,
             "username": "alice",
@@ -418,12 +343,7 @@ class TestV2EXChannel:
             "created": 1500000000,
         }
 
-        class FakeResponse:
-            def __enter__(self): return self
-            def __exit__(self, *_): pass
-            def read(self): return json.dumps(fake_user).encode()
-
-        monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: FakeResponse())
+        monkeypatch.setattr(v2ex_mod, "_get_json", lambda _url: fake_user)
         user = V2EXChannel().get_user("alice")
 
         assert user["id"] == 42

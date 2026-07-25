@@ -2,22 +2,100 @@
 """V2EX — public API channel for topics, nodes, users, and replies."""
 
 import json
-import urllib.request
+import shutil
+import subprocess
 from typing import Any
 
+import requests
+
 from agent_reach.utils.text import scrub_url_credentials
+from agent_reach.utils.url import host_matches
 
 from .base import Channel
 
 _UA = "agent-reach/1.0"
 _TIMEOUT = 10
+_MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+
+
+def _parse_json_bytes(payload: bytes) -> Any:
+    if len(payload) > _MAX_RESPONSE_BYTES:
+        raise ValueError("V2EX API response exceeds 5 MiB safety limit")
+    return json.loads(payload.decode("utf-8"))
+
+
+def _get_json_with_curl(url: str, tls_error: requests.exceptions.SSLError) -> Any:
+    """Retry one V2EX TLS failure through the platform curl executable."""
+    curl = shutil.which("curl")
+    if not curl:
+        raise tls_error
+
+    try:
+        result = subprocess.run(
+            [
+                curl,
+                "--fail",
+                "--silent",
+                "--show-error",
+                "--location",
+                "--proto",
+                "=https",
+                "--proto-redir",
+                "=https",
+                "--connect-timeout",
+                str(_TIMEOUT),
+                "--max-time",
+                str(_TIMEOUT),
+                "--max-filesize",
+                str(_MAX_RESPONSE_BYTES),
+                "--header",
+                f"User-Agent: {_UA}",
+                "--",
+                url,
+            ],
+            capture_output=True,
+            timeout=_TIMEOUT + 5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise tls_error
+    if result.returncode != 0:
+        raise tls_error
+    return _parse_json_bytes(result.stdout)
 
 
 def _get_json(url: str) -> Any:
-    """Fetch *url* and return parsed JSON. Raises on HTTP/network errors."""
-    req = urllib.request.Request(url, headers={"User-Agent": _UA})
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    """Fetch a public V2EX API URL with one TLS-specific curl fallback."""
+    if not host_matches(url, "v2ex.com") or not url.startswith("https://"):
+        raise ValueError("V2EX API URL must use HTTPS on v2ex.com")
+
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": _UA},
+            timeout=_TIMEOUT,
+            stream=True,
+        )
+    except requests.exceptions.SSLError as exc:
+        return _get_json_with_curl(url, exc)
+
+    try:
+        try:
+            response.raise_for_status()
+            payload = bytearray()
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                payload.extend(chunk)
+                if len(payload) > _MAX_RESPONSE_BYTES:
+                    raise ValueError(
+                        "V2EX API response exceeds 5 MiB safety limit"
+                    )
+            return _parse_json_bytes(bytes(payload))
+        except requests.exceptions.SSLError as exc:
+            return _get_json_with_curl(url, exc)
+    finally:
+        response.close()
 
 
 class V2EXChannel(Channel):
@@ -31,8 +109,6 @@ class V2EXChannel(Channel):
     # ------------------------------------------------------------------ #
 
     def can_handle(self, url: str) -> bool:
-        from agent_reach.utils.url import host_matches
-
         return host_matches(url, "v2ex.com")
 
     # ------------------------------------------------------------------ #
