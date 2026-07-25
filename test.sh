@@ -4,7 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agent-reach-test.XXXXXX")"
+TEST_DIR_RAW="$(mktemp -d "${TMPDIR:-/tmp}/agent-reach-test.XXXXXX")"
+TEST_DIR="$(cd "$TEST_DIR_RAW" && pwd -P)"
 HOME="$TEST_DIR/home"
 export HOME
 mkdir -p "$HOME"

@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.6.0] - 2026-07-25
+
+### 🔒 Security / 安全
+
+- `agent-reach install` 改为默认只检查、不修改系统；全局安装和配置写入必须显式使用 `--system`
+- 即使使用 `--system`，也不再执行远程 setup 脚本或自动写入 apt 软件源
+- Twitter Cookie 支持 `--stdin` 安全输入，并写入权限受限、可直接加载的 `~/.agent-reach/twitter.env`
+- 通用网页读取仅允许公开 HTTP(S) 地址，拒绝本机、内网、带凭据 URL，并限制响应为 5 MiB
+- 音频转写默认只发送给第一个已配置服务商；跨服务商重试必须显式使用 `--allow-provider-fallback`
+- 小宇宙脚本增加官方域名校验、随机私有临时目录，以及下载大小、音频时长、切片数和网络超时上限
+
+### 🐛 Bug Fixes / 修复
+
+- 修复 Windows 下 npm、mcporter、pipx 等 `.CMD` shim 被发现但无法由子进程执行的问题
+- 修复 V2EX 在 Python TLS 返回 `UNEXPECTED_EOF_WHILE_READING` 时被 Doctor 误判不可用；仅对此类 TLS 错误使用系统 curl 重试（#514）
+- 修正 Exa、LinkedIn 和集成测试文档中的过期或不存在命令
+- Agent 指令明确把网页、帖子、评论和搜索结果视为不可信数据，禁止把其中内容当作系统指令执行
+
+### ✅ Validation / 验证
+
+- 全量测试扩展到 462 项，覆盖安装副作用、凭据文件、跨服务商转写授权、资源上限、Windows 命令路径和 V2EX TLS 兜底
+- 项目静态检查清零，`test.sh` 改为验证当前 checkout 的真实 CLI 和 Doctor JSON 输出
+
+---
+
 ## [1.3.1] - 2026-03-27
 
 ### 🐛 Bug Fixes / 修复

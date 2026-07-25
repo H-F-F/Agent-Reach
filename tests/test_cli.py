@@ -4,12 +4,14 @@
 import shutil
 import subprocess
 from argparse import Namespace
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import requests
 
 import agent_reach.cli as cli
+from agent_reach import __version__
 from agent_reach.cli import main
 from agent_reach.config import Config
 
@@ -21,7 +23,10 @@ class TestCLI:
                 main()
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
-        assert "Agent Reach v" in captured.out
+        assert "Agent Reach v1.6.0" in captured.out
+        assert __version__ == "1.6.0"
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        assert 'version = "1.6.0"' in pyproject.read_text(encoding="utf-8")
 
     def test_no_command_shows_help(self, capsys):
         with pytest.raises(SystemExit) as exc_info:
