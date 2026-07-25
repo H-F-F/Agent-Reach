@@ -2,7 +2,54 @@
 
 from __future__ import annotations
 
+import ipaddress
 from urllib.parse import urlsplit
+
+_BLOCKED_PUBLIC_FETCH_HOSTS = {
+    "localhost",
+    "metadata.google.internal",
+}
+_BLOCKED_PUBLIC_FETCH_SUFFIXES = (
+    ".localhost",
+    ".internal",
+    ".local",
+    ".lan",
+)
+
+
+def _is_non_public_ip(host: str) -> bool:
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return not address.is_global
+
+
+def normalize_public_http_url(url: str) -> str:
+    """Normalize a URL or reject targets that are not clearly public HTTP(S)."""
+    candidate = str(url or "").strip()
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+
+    try:
+        parsed = urlsplit(candidate)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        _ = parsed.port
+    except (TypeError, ValueError):
+        raise ValueError("only public HTTP(S) URLs are allowed") from None
+
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or host in _BLOCKED_PUBLIC_FETCH_HOSTS
+        or host.endswith(_BLOCKED_PUBLIC_FETCH_SUFFIXES)
+        or _is_non_public_ip(host)
+    ):
+        raise ValueError("only public HTTP(S) URLs are allowed")
+
+    return parsed.geturl()
 
 
 def domain_matches(host: str, *domains: str) -> bool:

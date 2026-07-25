@@ -10,7 +10,9 @@ completing dedicated coverage for the channels that still lacked it.
 
 from unittest.mock import MagicMock, patch
 
-from agent_reach.channels.web import WebChannel, _UA
+import pytest
+
+from agent_reach.channels.web import _MAX_RESPONSE_BYTES, _UA, WebChannel
 
 
 def _resp(body=b"# Example\nfull text\n"):
@@ -90,3 +92,32 @@ def test_read_decodes_utf8_body():
     with patch("urllib.request.urlopen", return_value=_resp("café ☕\n".encode("utf-8"))):
         out = channel.read("https://example.com")
     assert out == "café ☕\n"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///etc/passwd",
+        "http://localhost/admin",
+        "http://127.0.0.1/private",
+        "http://169.254.169.254/latest/meta-data",
+        "https://user:password@example.com/private",
+    ],
+)
+def test_read_rejects_non_public_urls_before_network(url):
+    channel = WebChannel()
+
+    with patch("urllib.request.urlopen") as mock_open:
+        with pytest.raises(ValueError, match="public HTTP"):
+            channel.read(url)
+
+    mock_open.assert_not_called()
+
+
+def test_read_rejects_oversized_reader_response():
+    channel = WebChannel()
+    response = _resp(b"x" * (_MAX_RESPONSE_BYTES + 1))
+
+    with patch("urllib.request.urlopen", return_value=response):
+        with pytest.raises(ValueError, match="response exceeds"):
+            channel.read("https://example.com/large")
