@@ -8,11 +8,8 @@ Copy this to your AI Agent:
 帮我安装 Agent Reach：https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
 ```
 
-> 🛡️ **Security-conscious?** Use safe mode — it won't auto-install system packages:
-> ```
-> 帮我安装 Agent Reach（安全模式）：https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
-> 安装时使用 --safe 参数
-> ```
+> 🛡️ **默认安全：** 普通 `agent-reach install` 只检查，不做持久化写入。
+> 只有显式 `--system` 才会安装全局工具或写入 Agent Reach 配置。
 
 ---
 
@@ -51,7 +48,8 @@ All Agent Reach files go in dedicated directories — **never in the agent works
 ```bash
 # 推荐：pipx（最省心）
 pipx install https://github.com/Panniantong/agent-reach/archive/main.zip
-agent-reach install --env=auto
+agent-reach install --env=auto           # 只读检查
+agent-reach install --env=auto --system  # 用户确认后执行写入
 
 # 如果你的 Python 来自 Homebrew / 遇到 PEP 668（externally-managed-environment）
 # 用虚拟环境安装：
@@ -59,6 +57,7 @@ python3 -m venv ~/.agent-reach-venv
 source ~/.agent-reach-venv/bin/activate
 pip install https://github.com/Panniantong/agent-reach/archive/main.zip
 agent-reach install --env=auto
+agent-reach install --env=auto --system
 ```
 
 > 💡 **Windows / Microsoft Store Python alias?**
@@ -72,19 +71,25 @@ agent-reach install --env=auto
 > $env:USERPROFILE\.agent-reach-venv\Scripts\Activate.ps1
 > python -m pip install https://github.com/Panniantong/agent-reach/archive/main.zip
 > agent-reach install --env=auto
+> agent-reach install --env=auto --system
 > ```
 
-This installs core infrastructure (gh CLI, Node.js, mcporter, Exa search, yt-dlp config) and activates these zero-config channels:
+The first command only reports readiness. The explicit `--system` command installs
+global user-space tools such as mcporter, writes Agent Reach-managed config, and
+registers the Skill. Missing gh CLI or Node.js is reported with an official manual
+installation link; Agent Reach does not add OS package sources or execute remote
+setup scripts.
 
 - Web (Jina Reader), YouTube, GitHub, RSS, Exa Search, V2EX, Bilibili (basic)
 
 > 💡 **macOS / Homebrew Python 提示 `externally-managed-environment`？**
 > 这是 PEP 668 保护，不是 Agent Reach 本身的问题。优先用 `pipx install ...`，或先创建 `venv` 再安装。
 
-**Safe mode / Dry run:**
+**Default safe mode / Dry run:**
 
 ```bash
-agent-reach install --env=auto --safe      # Check only, no auto-install
+agent-reach install --env=auto             # Check only, no persistent writes
+agent-reach install --env=auto --safe      # Compatibility alias for the same behavior
 agent-reach install --env=auto --dry-run   # Preview what would be done
 ```
 
@@ -112,9 +117,9 @@ After installing the basics, **ask the user** which additional channels they nee
 Based on the user's choice, run:
 
 ```bash
-agent-reach install --env=auto --channels=opencli,xiaohongshu   # Example: desktop user chose XHS (OpenCLI-backed)
-agent-reach install --env=auto --channels=facebook,instagram    # Example: desktop user chose Meta social channels
-agent-reach install --env=auto --channels=all              # User wants everything
+agent-reach install --env=auto --system --channels=opencli,xiaohongshu   # Example: desktop user chose XHS (OpenCLI-backed)
+agent-reach install --env=auto --system --channels=facebook,instagram    # Example: desktop user chose Meta social channels
+agent-reach install --env=auto --system --channels=all                   # User wants everything
 ```
 
 Supported channel names: `opencli`, `twitter`, `xiaoyuzhou`, `xueqiu`, `xiaohongshu`, `reddit`, `facebook`, `instagram`, `bilibili`, `linkedin`, `all`
@@ -287,20 +292,20 @@ agent-reach configure groq-key gsk_xxxxx
 > - 转录质量高（Whisper large-v3），但不区分说话人
 > - 2 小时以上的播客建议分批处理
 
-**LinkedIn (可选 — linkedin-scraper-mcp):**
-> "LinkedIn 基本内容可通过 Jina Reader 读取。完整功能（Profile 详情、职位搜索）需要 linkedin-scraper-mcp。"
+**LinkedIn (可选 — mcp-server-linkedin):**
+> "LinkedIn 基本内容可通过 Jina Reader 读取。完整功能（Profile 详情、职位搜索）需要 mcp-server-linkedin。"
 
 ```bash
-pip install linkedin-scraper-mcp
+mcporter config add linkedin --command uvx --arg mcp-server-linkedin@latest --env UV_HTTP_TIMEOUT=300 --scope home
 ```
 
 > **登录方式（需要浏览器界面）：**
 >
-> linkedin-scraper-mcp 使用 Chromium 浏览器登录，需要你能看到浏览器窗口。
+> mcp-server-linkedin 使用 Chromium 浏览器登录，需要你能看到浏览器窗口。
 >
 > - **本地电脑（有桌面）：** 直接运行：
 >   ```bash
->   linkedin-scraper-mcp --login --no-headless
+>   uvx mcp-server-linkedin@latest --login
 >   ```
 >   浏览器会弹出来，手动登录 LinkedIn 即可。
 >
@@ -314,15 +319,12 @@ pip install linkedin-scraper-mcp
 >   
 >   # 3. 在 VNC 桌面的终端里运行：
 >   export DISPLAY=:1
->   linkedin-scraper-mcp --login --no-headless
+>   uvx mcp-server-linkedin@latest --login
 >   ```
 >   在 VNC 里看到浏览器后手动登录。登录成功后 session 会保存到 `~/.linkedin-mcp/profile/`。
 >
-> **登录后启动 MCP 服务：**
-> ```bash
-> linkedin-scraper-mcp --transport streamable-http --port 8001
-> mcporter config add linkedin http://localhost:8001/mcp --scope home
-> ```
+> mcporter 会按 stdio 启动服务，不需要单独常驻 HTTP 进程。上游默认 HTTP
+> 端口虽然是 8000，但本地推荐路径不使用它。
 >
 > 详见 https://github.com/stickerdaniel/linkedin-mcp-server
 
@@ -353,10 +355,11 @@ If the user wants a different agent to handle it, let them choose.
 
 | Command | What it does |
 |---------|-------------|
-| `agent-reach install --env=auto` | Install core channels (lightweight, zero-config) |
-| `agent-reach install --env=auto --channels=twitter,xiaohongshu` | Install core + optional channels |
-| `agent-reach install --env=auto --channels=all` | Install everything |
-| `agent-reach install --env=auto --safe` | Safe setup (no auto system changes) |
+| `agent-reach install --env=auto` | Safe readiness check; no persistent writes |
+| `agent-reach install --env=auto --system` | Explicitly install global tools and Agent Reach config |
+| `agent-reach install --env=auto --system --channels=twitter,xiaohongshu` | Install selected optional channels |
+| `agent-reach install --env=auto --system --channels=all` | Install everything after approval |
+| `agent-reach install --env=auto --safe` | Compatibility alias for safe readiness check |
 | `agent-reach install --env=auto --dry-run` | Preview what would be done |
 | `agent-reach doctor` | Show channel status |
 | `agent-reach watch` | Quick health + update check (for scheduled tasks) |

@@ -1,92 +1,85 @@
-#!/bin/bash
-# Agent Reach 一键完整测试
-# 用法: bash test-agent-reach.sh
-# 在任何有 Python 3.10+ 的机器上跑就行
+#!/usr/bin/env bash
+# Agent Reach 本地完整验收：当前源码、完整 pytest、CLI 和只读 Doctor。
 
-set -e
+set -euo pipefail
 
-echo "╔════════════════════════════════════════════╗"
-echo "║    👁️  Agent Reach 完整测试                ║"
-echo "╚════════════════════════════════════════════╝"
-echo ""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agent-reach-test.XXXXXX")"
+HOME="$TEST_DIR/home"
+export HOME
+mkdir -p "$HOME"
 
-# ── 1. 准备干净环境 ──
-echo "📦 创建测试环境..."
-TEST_DIR=$(mktemp -d)
-python3 -m venv "$TEST_DIR/venv"
-source "$TEST_DIR/venv/bin/activate"
-
-# ── 2. 安装 ──
-echo "📥 从 GitHub 安装..."
-pip install -q https://github.com/Panniantong/agent-reach/archive/main.zip 2>&1 | tail -1
-echo ""
-
-# ── 3. 自动配置 ──
-echo "⚙️  运行 install..."
-agent-reach install --env=auto 2>&1
-echo ""
-
-# ── 4. 诊断 ──
-echo "🩺 运行 doctor..."
-agent-reach doctor 2>&1
-echo ""
-
-# ── 5. 逐个测试 ──
-PASS=0
-FAIL=0
-SKIP=0
-
-test_it() {
-    local name="$1"
-    shift
-    echo -n "  $name ... "
-    output=$(eval "$@" 2>&1) || true
-    if echo "$output" | grep -q "📖\|🔗\|http"; then
-        echo "✅"
-        PASS=$((PASS+1))
-    elif echo "$output" | grep -q "⚠️\|not installed\|not configured"; then
-        echo "⏭️  (跳过 — 缺依赖)"
-        SKIP=$((SKIP+1))
-    else
-        echo "❌"
-        echo "    $(echo "$output" | head -2)"
-        FAIL=$((FAIL+1))
+cleanup() {
+    if command -v deactivate >/dev/null 2>&1; then
+        deactivate || true
     fi
+    rm -rf -- "$TEST_DIR"
+}
+trap cleanup EXIT INT TERM
+
+find_python() {
+    local candidate
+    for candidate in "${PYTHON:-}" python3.13 python3.12 python3.11 python3.10 python3; do
+        if [ -z "$candidate" ] || ! command -v "$candidate" >/dev/null 2>&1; then
+            continue
+        fi
+        if "$candidate" -c \
+            'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+            command -v "$candidate"
+            return 0
+        fi
+    done
+    return 1
 }
 
-echo "📖 阅读测试"
-test_it "网页" "agent-reach read 'https://example.com'"
-test_it "GitHub" "agent-reach read 'https://github.com/Panniantong/agent-reach'"
-test_it "YouTube" "agent-reach read 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'"
-test_it "B站" "agent-reach read 'https://www.bilibili.com/video/BV1d4411N7zD'"
-test_it "RSS" "agent-reach read 'https://hnrss.org/frontpage'"
-test_it "Twitter" "agent-reach read 'https://x.com/elonmusk/status/1893797839927353448'"
-test_it "Reddit" "agent-reach read 'https://www.reddit.com/r/LocalLLaMA/hot'"
-
-echo ""
-echo "🔍 搜索测试"
-test_it "全网搜索" "agent-reach search 'best AI agent framework' -n 2"
-test_it "GitHub搜索" "agent-reach search-github 'yt-dlp' -n 2"
-test_it "Twitter搜索" "agent-reach search-twitter 'AI agent' -n 2"
-test_it "Reddit搜索" "agent-reach search-reddit 'machine learning' -n 2"
-test_it "YouTube搜索" "agent-reach search-youtube 'AI tutorial' -n 2"
-test_it "B站搜索" "agent-reach search-bilibili 'AI' -n 2"
-test_it "小红书搜索" "agent-reach search-xhs 'AI' -n 2"
-
-echo ""
-echo "════════════════════════════════════════════"
-echo "  ✅ 通过: $PASS   ❌ 失败: $FAIL   ⏭️  跳过: $SKIP"
-echo "════════════════════════════════════════════"
-
-# ── 6. 清理 ──
-deactivate 2>/dev/null || true
-rm -rf "$TEST_DIR"
-
-if [ $FAIL -eq 0 ]; then
-    echo ""
-    echo "🎉 全部通过！"
-else
-    echo ""
-    echo "⚠️  有 $FAIL 个测试失败，请检查上面的输出"
+PYTHON_BIN="$(find_python)" || {
+    echo "需要 Python 3.10 或更高版本" >&2
     exit 1
+}
+VENV_DIR="$TEST_DIR/venv"
+
+echo "╔════════════════════════════════════════════╗"
+echo "║    👁️  Agent Reach 本地完整验收             ║"
+echo "╚════════════════════════════════════════════╝"
+echo "Python: $("$PYTHON_BIN" --version 2>&1)"
+
+if command -v uv >/dev/null 2>&1; then
+    uv venv --quiet --seed --python "$PYTHON_BIN" "$VENV_DIR"
+else
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
+
+# shellcheck disable=SC1091
+source "$VENV_DIR/bin/activate"
+python -m pip install --quiet --disable-pip-version-check -e "$SCRIPT_DIR[dev]"
+
+echo "🧪 运行完整测试..."
+python -m pytest "$SCRIPT_DIR/tests" -q
+
+echo "🔎 验证真实 CLI..."
+agent-reach version
+agent-reach install --env=local
+agent-reach install --env=local --system --dry-run
+agent-reach doctor --json > "$TEST_DIR/doctor.json"
+
+DOCTOR_JSON="$TEST_DIR/doctor.json" python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+report = json.loads(Path(os.environ["DOCTOR_JSON"]).read_text(encoding="utf-8"))
+if not isinstance(report, dict) or not report:
+    raise SystemExit("doctor --json did not return a channel report")
+PY
+
+python - <<'PY'
+from agent_reach.channels.github import GitHubChannel
+from agent_reach.channels.web import WebChannel
+from agent_reach.channels.youtube import YouTubeChannel
+
+assert GitHubChannel().can_handle("https://github.com/Panniantong/Agent-Reach")
+assert YouTubeChannel().can_handle("https://www.youtube.com/watch?v=test")
+assert WebChannel().can_handle("https://example.com")
+PY
+
+echo "✅ 完整验收通过：源码安装、pytest、默认安全安装、dry-run、Doctor、渠道路由"

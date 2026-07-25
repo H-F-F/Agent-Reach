@@ -90,7 +90,8 @@ Update Agent Reach: https://raw.githubusercontent.com/Panniantong/agent-reach/ma
 Install Agent Reach: https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
 ```
 
-エージェントが自動でインストールし、環境を検出し、何が使えるかを教えてくれます。
+エージェントは最初に読み取り専用で環境を確認します。実際のツール導入と設定書き込みには
+明示的な `--system` が必要です。
 
 > 🔄 **すでにインストール済み？** 1コマンドでアップデート：
 > ```
@@ -103,6 +104,7 @@ Install Agent Reach: https://raw.githubusercontent.com/Panniantong/agent-reach/m
 ```bash
 pip install https://github.com/Panniantong/agent-reach/archive/main.zip
 agent-reach install --env=auto
+agent-reach install --env=auto --system
 ```
 </details>
 
@@ -115,7 +117,7 @@ npx skills add Panniantong/Agent-Reach@agent-reach
 
 Skillインストール後、エージェントは`agent-reach` CLIが利用可能かを自動検出し、必要に応じてインストールします。
 
-> `agent-reach install` でインストールした場合、Skillは自動的に登録されます — 追加の手順は不要です。
+> `agent-reach install --system` を使った場合、Skillは自動的に登録されます。
 </details>
 
 ---
@@ -228,7 +230,7 @@ channels/
 | RSS閲覧 | [feedparser](https://github.com/kurtmckee/feedparser) | Pythonエコシステムの標準、⭐2.3K |
 | 小紅書 | [OpenCLI](https://github.com/jackwener/opencli)（デスクトップ）▸ [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)（サーバー）▸ xhs-cli | OpenCLI は既存のユーザー管理セッションのみ使用。その他は Cookie-Editor で手動設定 |
 | 抖音 | [douyin-mcp-server](https://github.com/yzfly/douyin-mcp-server) | MCPサーバー、ログイン不要、動画解析 + ウォーターマークなしダウンロード |
-| LinkedIn | [linkedin-scraper-mcp](https://github.com/stickerdaniel/linkedin-mcp-server) | ⭐900+、MCPサーバー、ブラウザ自動化 |
+| LinkedIn | [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server) | MCPサーバー、ブラウザ自動化 |
 | WeChat記事 | [Exa](https://exa.ai)（検索+閲覧）+ [Camoufox](https://github.com/daijro/camoufox)（オプション） | ゼロ設定で検索+全文閲覧、Camoufoxでオプション強化 |
 | Weibo | `mcporter` | `mcporter call 'weibo.get_trendings(limit: 10)'` |
 | 小宇宙Podcast | `transcribe.sh` | `bash ~/.agent-reach/tools/xiaoyuzhou/transcribe.sh <URL>` |
@@ -303,7 +305,7 @@ douyin-mcp-serverをインストールすれば、`mcporter call 'douyin.parse_d
 
 ## クレジット
 
-[twitter-cli](https://github.com/public-clis/twitter-cli) · [rdt-cli](https://github.com/public-clis/rdt-cli) · [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) · [Jina Reader](https://github.com/jina-ai/reader) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) · [Exa](https://exa.ai) · [feedparser](https://github.com/kurtmckee/feedparser) · [douyin-mcp-server](https://github.com/yzfly/douyin-mcp-server) · [linkedin-scraper-mcp](https://github.com/stickerdaniel/linkedin-mcp-server)
+[twitter-cli](https://github.com/public-clis/twitter-cli) · [rdt-cli](https://github.com/public-clis/rdt-cli) · [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) · [Jina Reader](https://github.com/jina-ai/reader) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) · [Exa](https://exa.ai) · [feedparser](https://github.com/kurtmckee/feedparser) · [douyin-mcp-server](https://github.com/yzfly/douyin-mcp-server) · [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server)
 
 ## お問い合わせ
 

@@ -110,7 +110,7 @@ curl -s -b /tmp/bili_ck.txt -A "$UA" -e "https://www.bilibili.com/" \
 1. **ffmpeg**: `brew install ffmpeg`
 2. **Groq API Key** (免费): https://console.groq.com/keys
 3. **配置 Key**: `agent-reach configure groq-key YOUR_KEY`
-4. **首次运行**: `agent-reach install --env=auto` 安装工具
+4. **首次运行**: 用户明确授权后运行 `agent-reach install --env=auto --system --channels=xiaoyuzhou`
 
 ### 检查状态
 

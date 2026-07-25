@@ -1,18 +1,28 @@
 # -*- coding: utf-8 -*-
-"""LinkedIn — check if linkedin-scraper-mcp is available."""
+"""LinkedIn — check whether the supported MCP server is configured."""
 
 import shutil
 
 from .base import Channel
 from .mcporter import McporterConfigError, inspect_mcporter_config
 
-_LINKEDIN_SERVER_NAMES = {"linkedin", "linkedin-scraper", "linkedin-scraper-mcp"}
+_LINKEDIN_SERVER_NAMES = {
+    "linkedin",
+    "mcp-server-linkedin",
+    "linkedin-scraper",
+    "linkedin-scraper-mcp",
+}
+_LINKEDIN_SETUP = (
+    "mcporter config add linkedin --command uvx "
+    "--arg mcp-server-linkedin@latest "
+    "--env UV_HTTP_TIMEOUT=300 --scope home"
+)
 
 
 class LinkedInChannel(Channel):
     name = "linkedin"
     description = "LinkedIn 职业社交"
-    backends = ["linkedin-scraper-mcp", "Jina Reader"]
+    backends = ["mcp-server-linkedin", "Jina Reader"]
     tier = 2
 
     def can_handle(self, url: str) -> bool:
@@ -25,9 +35,8 @@ class LinkedInChannel(Channel):
         if not shutil.which("mcporter"):
             return "off", (
                 "基本内容可通过 Jina Reader 读取。完整功能需要：\n"
-                "  pip install linkedin-scraper-mcp\n"
-                "  mcporter config add linkedin http://localhost:3000/mcp "
-                "--scope home\n"
+                "  安装 uv：https://docs.astral.sh/uv/\n"
+                f"  {_LINKEDIN_SETUP}\n"
                 "  详见 https://github.com/stickerdaniel/linkedin-mcp-server"
             )
         try:
@@ -46,7 +55,5 @@ class LinkedInChannel(Channel):
             )
         return "off", (
             "mcporter 已装但 LinkedIn MCP 未配置。运行：\n"
-            "  pip install linkedin-scraper-mcp\n"
-            "  mcporter config add linkedin http://localhost:3000/mcp "
-            "--scope home"
+            f"  {_LINKEDIN_SETUP}"
         )

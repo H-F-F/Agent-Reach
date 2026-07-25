@@ -119,24 +119,22 @@ AI Agent 已经能帮你写代码、改文档、管项目——但你让它去�
 帮我安装 Agent Reach：https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
 ```
 
-就这一步。Agent 会自己完成剩下的所有事情。
+就这一步。Agent 会先做只读检查，说明准备写入什么；只有显式使用
+`--system` 才会安装全局工具或写入 Agent Reach 配置。
 
 > 🔄 **已安装过？** 更新也是一句话：
 > ```
 > 帮我更新 Agent Reach：https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/update.md
 > ```
 
-> 🛡️ **担心安全？** 可以用安全模式——不会自动装系统包，只告诉你需要什么：
-> ```
-> 帮我安装 Agent Reach（安全模式）：https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
-> 安装时使用 --safe 参数
-> ```
+> 🛡️ **默认就是安全检查模式。** 普通 `agent-reach install` 不做持久化写入；
+> `--safe` 仅作为兼容别名保留。需要实际安装时必须显式加 `--system`。
 
 <details>
 <summary>它会做什么？（点击展开）</summary>
 
 1. **安装 CLI 工具** — `pip install` 装好 `agent-reach` 命令行（自带 yt-dlp、feedparser）
-2. **安装系统基建** — 自动检测并安装 Node.js、gh CLI、mcporter
+2. **检查系统基建** — 检测 Node.js、gh CLI；缺失时给出官方安装地址，不写系统软件源
 3. **配置搜索引擎** — 通过 MCP 接入 Exa（免费，无需 API Key）
 4. **检测环境** — 判断是本地电脑还是服务器，给出对应的配置建议
 5. **注册 SKILL.md** — 在 Agent 的 skills 目录安装使用指南，以后 Agent 遇到"全网调研"、"搜推特"、"看视频"这类需求，会自动知道该调哪个上游工具
@@ -214,7 +212,7 @@ channels/
 | GitHub | [gh CLI](https://cli.github.com) | — | 官方工具，认证后完整 API 能力 |
 | 读 RSS | [feedparser](https://github.com/kurtmckee/feedparser) | — | Python 生态标准选择 |
 | 小红书 | [OpenCLI](https://github.com/jackwener/opencli)（桌面） | [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)（服务器）▸ xhs-cli | OpenCLI 只用用户已有会话；其余后端用 Cookie-Editor 手工导出 |
-| LinkedIn | [linkedin-scraper-mcp](https://github.com/stickerdaniel/linkedin-mcp-server) | Jina Reader | MCP 服务，浏览器自动化 |
+| LinkedIn | [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server) | Jina Reader | MCP 服务，浏览器自动化 |
 
 > 📌 这些都是「当前选型」，基于真机实测定期复核。某条路失效了我们换下一条——`agent-reach doctor` 永远告诉你现在走的是哪条。
 
@@ -227,7 +225,8 @@ Agent Reach 在设计上重视安全：
 | 措施 | 说明 |
 |------|------|
 | 🔒 **凭据本地存储** | Cookie、Token 只存在你本机 `~/.agent-reach/config.yaml`，文件权限 600（仅所有者可读写），不上传不外传 |
-| 🛡️ **安全模式** | `agent-reach install --safe` 不会自动修改系统，只列出需要什么，由你决定装不装 |
+| 🛡️ **默认安全** | `agent-reach install` 默认零持久化写入，只列出需要什么 |
+| ✍️ **显式写入** | `agent-reach install --system` 才会安装全局工具和写入 Agent Reach 配置 |
 | 👀 **完全开源** | 代码透明，随时可审查。所有依赖工具也是开源项目 |
 | 🔍 **Dry Run** | `agent-reach install --dry-run` 预览所有操作，不做任何改动 |
 | 🧩 **可插拔架构** | 不信任某个组件？换掉对应的 channel 文件即可，不影响其他 |
@@ -244,8 +243,8 @@ Agent Reach 在设计上重视安全：
 
 | 方式 | 命令 | 适合场景 |
 |------|------|---------|
-| 一键全自动（默认） | `agent-reach install --env=auto` | 个人电脑、开发环境 |
-| 安全模式 | `agent-reach install --env=auto --safe` | 生产服务器、多人共用机器 |
+| 默认安全检查 | `agent-reach install --env=auto` | 任何环境，零持久化写入 |
+| 明确授权安装 | `agent-reach install --env=auto --system` | 用户确认后安装全局工具和配置 |
 | 仅预览 | `agent-reach install --env=auto --dry-run` | 先看看会做什么 |
 
 ### 🗑️ 卸载
@@ -284,7 +283,7 @@ Star 一下，下次需要的时候能找到。⭐
 
 ## 致谢
 
-[OpenCLI](https://github.com/jackwener/opencli) · [twitter-cli](https://github.com/public-clis/twitter-cli) · [rdt-cli](https://github.com/public-clis/rdt-cli) · [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) · [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) · [bili-cli](https://github.com/public-clis/bilibili-cli) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) · [Jina Reader](https://github.com/jina-ai/reader) · [Exa](https://exa.ai) · [mcporter](https://github.com/nicobailon/mcporter) · [feedparser](https://github.com/kurtmckee/feedparser) · [linkedin-scraper-mcp](https://github.com/stickerdaniel/linkedin-mcp-server)
+[OpenCLI](https://github.com/jackwener/opencli) · [twitter-cli](https://github.com/public-clis/twitter-cli) · [rdt-cli](https://github.com/public-clis/rdt-cli) · [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) · [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) · [bili-cli](https://github.com/public-clis/bilibili-cli) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) · [Jina Reader](https://github.com/jina-ai/reader) · [Exa](https://exa.ai) · [mcporter](https://github.com/nicobailon/mcporter) · [feedparser](https://github.com/kurtmckee/feedparser) · [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server)
 
 ## 联系
 

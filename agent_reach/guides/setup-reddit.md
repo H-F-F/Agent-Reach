@@ -24,7 +24,7 @@ pipx install 'git+https://github.com/public-clis/rdt-cli.git'
 
 或一键安装：
 ```bash
-agent-reach install --env=auto --channels=reddit
+agent-reach install --env=auto --system --channels=reddit
 ```
 
 ## 使用示例
@@ -41,7 +41,8 @@ rdt read POST_ID
 
 ## 需要用户手动做的步骤
 
-无。rdt-cli 通过 `agent-reach install --env=auto` 自动安装。
+无。用户显式授权后，rdt-cli 通过
+`agent-reach install --env=auto --system --channels=reddit` 安装。
 
 ## Fallback：Exa 搜索
 
