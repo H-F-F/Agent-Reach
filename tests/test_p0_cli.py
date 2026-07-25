@@ -192,6 +192,7 @@ def test_install_does_not_implicitly_read_browser_cookies(monkeypatch, tmp_path,
         Namespace(
             env="local",
             proxy="",
+            system=True,
             safe=False,
             dry_run=False,
             channels="twitter",
@@ -540,6 +541,80 @@ def test_system_install_uses_ytdlp_first_user_config(
     config_path = tmp_path / ".config" / "yt-dlp" / "config"
     assert config_path.read_text(encoding="utf-8") == "--js-runtimes node\n"
     assert not (tmp_path / ".legacy-config" / "config").exists()
+
+
+def test_system_install_never_bootstraps_remote_package_sources(
+    monkeypatch, capsys
+):
+    """Even explicit system mode must leave missing system packages to the user."""
+    import builtins
+    import platform
+    import shutil
+
+    commands = []
+    monkeypatch.setattr(platform, "system", lambda: "Linux")
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    monkeypatch.setattr(
+        builtins,
+        "open",
+        lambda *_args, **_kwargs: pytest.fail(
+            "installer must not write system package source files"
+        ),
+    )
+
+    def fake_run(args, **_kwargs):
+        commands.append(args)
+        return _docker_result(args, stdout="amd64\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    cli._install_system_deps()
+
+    assert commands == []
+    output = capsys.readouterr().out
+    assert "https://cli.github.com" in output
+    assert "https://nodejs.org" in output
+
+
+def test_system_install_does_not_report_failed_undici_as_success(
+    monkeypatch, capsys
+):
+    import shutil
+
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}"
+        if name in {"gh", "node", "npm"}
+        else None,
+    )
+
+    def fake_run(args, **_kwargs):
+        if args[1:3] == ["root", "-g"]:
+            return _docker_result(args, stdout="/missing/npm-root\n")
+        return _docker_result(args, returncode=1, stderr="install failed")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    cli._install_system_deps()
+
+    output = capsys.readouterr().out
+    assert "✅ undici installed" not in output
+    assert "undici install failed" in output
+
+
+def test_install_dry_run_never_suggests_remote_setup_scripts(
+    monkeypatch, capsys
+):
+    import shutil
+
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+
+    cli._install_system_deps_dryrun()
+
+    output = capsys.readouterr().out
+    assert "curl" not in output
+    assert "https://nodejs.org" in output
 
 
 @pytest.mark.parametrize(

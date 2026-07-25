@@ -68,8 +68,17 @@ def main():
     p_install.add_argument("--proxy", default="",
                            help="Network proxy saved for agents to export as HTTP(S)_PROXY "
                                 "in restricted networks (http://user:pass@ip:port)")
-    p_install.add_argument("--safe", action="store_true",
-                           help="Safe mode: skip automatic system changes, show what's needed instead")
+    install_mode = p_install.add_mutually_exclusive_group()
+    install_mode.add_argument(
+        "--system",
+        action="store_true",
+        help="Explicitly allow global tool installation and Agent Reach-managed writes",
+    )
+    install_mode.add_argument(
+        "--safe",
+        action="store_true",
+        help="Safe check-only mode (default; retained for compatibility)",
+    )
     p_install.add_argument("--dry-run", action="store_true",
                            help="Show what would be done without making any changes")
     p_install.add_argument("--channels", default="",
@@ -213,7 +222,7 @@ def _cmd_install(args):
     from agent_reach.config import Config
     from agent_reach.doctor import check_all, format_report
 
-    safe_mode = args.safe
+    safe_mode = args.safe or not getattr(args, "system", False)
     dry_run = args.dry_run
 
     # Validate channel names before constructing config or changing the system.
@@ -588,11 +597,9 @@ def _cmd_format(args):
 
 
 def _install_system_deps():
-    """Install system-level dependencies: gh CLI, Node.js (for mcporter)."""
+    """Configure optional tooling without bootstrapping OS package sources."""
     import shutil
     import subprocess
-    import platform
-    import tempfile
 
     print("Checking system dependencies...")
 
@@ -600,93 +607,48 @@ def _install_system_deps():
     if shutil.which("gh"):
         print("  ✅ gh CLI already installed")
     else:
-        print("  Installing gh CLI...")
-        os_type = platform.system().lower()
-        if os_type == "linux":
-            try:
-                # Official GitHub apt source setup without invoking a shell.
-                keyring_path = "/usr/share/keyrings/githubcli-archive-keyring.gpg"
-                list_path = "/etc/apt/sources.list.d/github-cli.list"
-                arch = subprocess.run(
-                    ["dpkg", "--print-architecture"],
-                    capture_output=True, encoding="utf-8", errors="replace", timeout=10,
-                ).stdout.strip() or "amd64"
-                subprocess.run(
-                    ["curl", "-fsSL", "https://cli.github.com/packages/githubcli-archive-keyring.gpg", "-o", keyring_path],
-                    capture_output=True, timeout=60,
-                )
-                repo_line = (
-                    f"deb [arch={arch} signed-by={keyring_path}] "
-                    "https://cli.github.com/packages stable main\n"
-                )
-                with open(list_path, "w", encoding="utf-8") as f:
-                    f.write(repo_line)
-                subprocess.run(["apt-get", "update", "-qq"], capture_output=True, timeout=60)
-                subprocess.run(["apt-get", "install", "-y", "-qq", "gh"], capture_output=True, timeout=60)
-                if shutil.which("gh"):
-                    print("  ✅ gh CLI installed")
-                else:
-                    print("  [!]  gh CLI install failed. You can try: snap install gh, or download from https://github.com/cli/cli/releases")
-            except Exception:
-                print("  [!]  gh CLI install failed. You can try: snap install gh, or download from https://github.com/cli/cli/releases")
-        elif os_type == "darwin":
-            if shutil.which("brew"):
-                try:
-                    subprocess.run(["brew", "install", "gh"], capture_output=True, timeout=120)
-                    if shutil.which("gh"):
-                        print("  ✅ gh CLI installed")
-                    else:
-                        print("  [!]  gh CLI install failed. Try: brew install gh")
-                except Exception:
-                    print("  [!]  gh CLI install failed. Try: brew install gh")
-            else:
-                print("  [!]  gh CLI not found. Install: https://cli.github.com")
-        else:
-            print("  [!]  gh CLI not found. Install: https://cli.github.com")
+        print("  -- gh CLI not found. Install it manually: https://cli.github.com")
 
     # ── Node.js (needed for mcporter) ──
     if shutil.which("node") and shutil.which("npm"):
         print("  ✅ Node.js already installed")
     else:
-        print("  Installing Node.js...")
-        try:
-            # Use NodeSource setup script without invoking a shell pipeline.
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".sh") as tf:
-                script_path = tf.name
-            subprocess.run(
-                ["curl", "-fsSL", "https://deb.nodesource.com/setup_22.x", "-o", script_path],
-                capture_output=True, timeout=60,
-            )
-            subprocess.run(
-                ["bash", script_path],
-                capture_output=True, timeout=120,
-            )
-            try:
-                os.unlink(script_path)
-            except Exception:
-                pass
-            subprocess.run(
-                ["apt-get", "install", "-y", "-qq", "nodejs"],
-                capture_output=True, timeout=120,
-            )
-            if shutil.which("node"):
-                print("  ✅ Node.js installed")
-            else:
-                print("  [!]  Node.js install failed. Try: apt install nodejs npm, or nvm install 22, or download from https://nodejs.org")
-        except Exception:
-            print("  [!]  Node.js install failed. Try: apt install nodejs npm, or nvm install 22, or download from https://nodejs.org")
+        print("  -- Node.js not found. Install it manually: https://nodejs.org")
 
     # ── undici (proxy support for Node.js fetch) ──
     npm_cmd = shutil.which("npm")
     if npm_cmd:
-        npm_root = subprocess.run([npm_cmd, "root", "-g"], capture_output=True, encoding="utf-8", errors="replace", timeout=5).stdout.strip()
+        npm_root_result = subprocess.run(
+            [npm_cmd, "root", "-g"],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+        )
+        npm_root = (
+            npm_root_result.stdout.strip()
+            if npm_root_result.returncode == 0
+            else ""
+        )
         undici_path = os.path.join(npm_root, "undici", "index.js") if npm_root else ""
         if os.path.exists(undici_path):
             print("  ✅ undici already installed (Node.js proxy support)")
         else:
             try:
-                subprocess.run([npm_cmd, "install", "-g", "undici"], capture_output=True, encoding="utf-8", errors="replace", timeout=60)
-                print("  ✅ undici installed (Node.js proxy support)")
+                result = subprocess.run(
+                    [npm_cmd, "install", "-g", "undici"],
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=60,
+                )
+                if result.returncode == 0:
+                    print("  ✅ undici installed (Node.js proxy support)")
+                else:
+                    print(
+                        "  -- undici install failed "
+                        "(optional — may not work behind proxies)"
+                    )
             except Exception:
                 print("  -- undici install failed (optional — may not work behind proxies)")
 
@@ -1017,8 +979,8 @@ def _install_system_deps_dryrun():
     print("[dry-run] System dependency check:")
 
     checks = [
-        ("gh CLI", ["gh"], "apt install gh / brew install gh"),
-        ("Node.js", ["node"], "curl NodeSource setup | bash + apt install nodejs"),
+        ("gh CLI", ["gh"], "https://cli.github.com"),
+        ("Node.js", ["node"], "https://nodejs.org"),
     ]
 
     for label, binaries, method in checks:
@@ -1026,7 +988,7 @@ def _install_system_deps_dryrun():
         if found:
             print(f"  ✅ {label}: already installed, skip")
         else:
-            print(f"  {label}: would install via: {method}")
+            print(f"  {label}: manual install required: {method}")
 
 
 

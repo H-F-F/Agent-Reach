@@ -419,3 +419,43 @@ def test_safe_install_with_proxy_makes_no_persistent_writes(
     output = capsys.readouterr().out
     assert "SAFE MODE" in output
     assert "Would save network proxy" in output
+
+
+def test_install_is_safe_by_default(isolated_home, monkeypatch, capsys):
+    """Plain install checks readiness without modifying the host."""
+    monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
+    monkeypatch.setattr(
+        cli,
+        "_install_system_deps",
+        lambda: pytest.fail("default install must not modify system dependencies"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_install_mcporter",
+        lambda: pytest.fail("default install must not install global tools"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_install_skill",
+        lambda: pytest.fail("default install must not register agent skills"),
+    )
+    monkeypatch.setattr(
+        "agent_reach.doctor.check_all",
+        lambda _config: {},
+    )
+    monkeypatch.setattr(
+        "agent_reach.doctor.format_report",
+        lambda _results: "report",
+    )
+    monkeypatch.setattr(
+        cli.sys,
+        "argv",
+        ["agent-reach", "install", "--env", "local"],
+    )
+
+    cli.main()
+
+    assert not (isolated_home / ".agent-reach").exists()
+    output = capsys.readouterr().out
+    assert "SAFE MODE" in output
+    assert "No changes were made" in output

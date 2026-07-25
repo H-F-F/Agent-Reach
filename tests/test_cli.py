@@ -212,6 +212,7 @@ class TestCLI:
             Namespace(
                 env="auto",
                 proxy="",
+                system=True,
                 safe=False,
                 dry_run=False,
                 channels="facebook,instagram,opencli",
