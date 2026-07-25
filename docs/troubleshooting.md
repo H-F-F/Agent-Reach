@@ -22,16 +22,15 @@ agent-reach configure --from-browser chrome --platform xueqiu
 
 **原因：** twitter-cli 需要 `TWITTER_AUTH_TOKEN` 和 `TWITTER_CT0`
 环境变量才能访问 Twitter API。`agent-reach configure twitter-cookies`
-保存的值只供 doctor 检查配置是否齐全；doctor 不执行上游认证，也不会设置当前
-Shell。如果你的网络环境需要代理才能访问 x.com，还需要配置代理。
+会生成私密的 `~/.agent-reach/twitter.env`；doctor 不执行上游认证，也不会设置
+当前 Shell。如果你的网络环境需要代理才能访问 x.com，还需要配置代理。
 
 **解决方案：**
 
 ### 方案 1：设置环境变量代理
 
 ```bash
-export TWITTER_AUTH_TOKEN="..."
-export TWITTER_CT0="..."
+. ~/.agent-reach/twitter.env
 export HTTP_PROXY="http://user:pass@host:port"
 export HTTPS_PROXY="http://user:pass@host:port"
 twitter search "test" -n 1
@@ -62,6 +61,7 @@ twitter check
 ```
 
 > 如果返回 "Missing credentials"，需要在运行该命令的进程环境中设置
-> `TWITTER_AUTH_TOKEN` 和 `TWITTER_CT0`。
+> `TWITTER_AUTH_TOKEN` 和 `TWITTER_CT0`；先加载
+> `~/.agent-reach/twitter.env`。
 >
 > **Fallback：** 如果你已经安装了 bird CLI（`npm install -g @steipete/bird`），它也能正常工作。Agent Reach 会自动检测已安装的工具。

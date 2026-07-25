@@ -155,7 +155,7 @@ No configuration needed — just tell your Agent:
 - "Read this link" → `curl https://r.jina.ai/URL` for any web page
 - "What's this GitHub repo about?" → `gh repo view owner/repo`
 - "What does this video cover?" → `yt-dlp --dump-json URL` for subtitles
-- "Read this tweet" → set `TWITTER_AUTH_TOKEN` / `TWITTER_CT0`, then run `twitter tweet URL`
+- "Read this tweet" → source `~/.agent-reach/twitter.env`, then run `twitter tweet URL`
 - "Subscribe to this RSS" → `feedparser` to parse feeds
 - "Search GitHub for LLM frameworks" → `gh search repos "LLM framework"`
 
@@ -176,10 +176,10 @@ Don't use it? Don't configure it. Every step is optional.
 ### 🍪 Cookies — Free, 2 minutes
 
 Tell your Agent "help me configure Twitter cookies" — it'll guide you through a
-manual Cookie-Editor export. Agent Reach saves the values for `doctor` to check
-whether credentials are present; `doctor` does not run `twitter status`.
-Direct `twitter` commands still require `TWITTER_AUTH_TOKEN` and `TWITTER_CT0`
-in their process environment.
+manual Cookie-Editor export. Agent Reach writes an owner-only
+`~/.agent-reach/twitter.env`; source it before direct `twitter` commands.
+`doctor` checks only whether explicit credentials exist and does not run
+`twitter status`.
 
 For XiaoHongShu, Agent Reach never logs the user in or reads browser cookies.
 OpenCLI may use only an existing Chrome session explicitly controlled by the

@@ -80,14 +80,12 @@ xhs feed                    # 推荐
 
 ### 认证前置条件
 
-`agent-reach configure twitter-cookies "..."` 保存的 Cookie 只供
-`agent-reach doctor` 检查显式凭据是否齐全。`doctor` 不执行上游
-`twitter status`，也不会设置当前 Shell。运行下面任何 `twitter` 命令前，
-必须在同一个 Shell 或子进程环境中显式提供：
+`agent-reach configure twitter-cookies --stdin` 会生成权限为 0600 的
+`~/.agent-reach/twitter.env`。`doctor` 只检查配置，不执行上游
+`twitter status`。运行下面任何 `twitter` 命令前加载：
 
 ```bash
-export TWITTER_AUTH_TOKEN="..."
-export TWITTER_CT0="..."
+. ~/.agent-reach/twitter.env
 ```
 
 ### 稳定命令
@@ -130,8 +128,8 @@ twitter likes
 
 > **安装**: `pipx install twitter-cli`（确保 v0.8.5+）
 >
-> **认证**: 只用 Cookie-Editor 手工导出，再显式设置环境变量
-> `TWITTER_AUTH_TOKEN` + `TWITTER_CT0`；不要依赖自动浏览器读取。
+> **认证**: 只用 Cookie-Editor 手工导出，通过 `--stdin` 保存，再加载
+> `~/.agent-reach/twitter.env`；不要依赖自动浏览器读取。
 >
 > **IP 风控**: 不要在 VPS/数据中心 IP 上频繁调用，尤其是 followers/following，有封号风险。使用住宅代理或本地环境。
 >

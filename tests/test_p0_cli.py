@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
@@ -370,6 +371,33 @@ def test_twitter_configure_never_runs_upstream_browser_fallback(
     assert "已保存" in output
     assert "未实时验证" in output
     assert "Twitter access works" not in output
+
+
+def test_twitter_cookies_can_be_read_from_stdin(
+    isolated_home, monkeypatch, capsys
+):
+    monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        cli.sys,
+        "stdin",
+        io.StringIO("auth_token=stdin-auth; ct0=stdin-ct0\n"),
+    )
+    monkeypatch.setattr(
+        cli.sys,
+        "argv",
+        ["agent-reach", "configure", "twitter-cookies", "--stdin"],
+    )
+
+    cli.main()
+
+    env_file = isolated_home / ".agent-reach" / "twitter.env"
+    payload = env_file.read_text(encoding="utf-8")
+    assert "stdin-auth" in payload
+    assert "stdin-ct0" in payload
+    output = capsys.readouterr().out
+    assert "stdin-auth" not in output
+    assert "stdin-ct0" not in output
 
 
 def test_doctor_never_installs_or_updates_skill(monkeypatch, capsys):

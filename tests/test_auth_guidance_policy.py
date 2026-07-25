@@ -71,7 +71,7 @@ def test_xiaohongshu_opencli_and_export_boundaries_are_truthful():
 
 
 def test_twitter_operational_docs_explain_the_environment_boundary():
-    """Saved cookies help doctor only; direct twitter commands need env vars."""
+    """Saved cookies produce a private env file for direct twitter commands."""
     operational_docs = (
         ROOT / "README.md",
         ROOT / "docs" / "README_en.md",
@@ -88,8 +88,7 @@ def test_twitter_operational_docs_explain_the_environment_boundary():
 
     for path in operational_docs:
         text = path.read_text(encoding="utf-8")
-        assert "TWITTER_AUTH_TOKEN" in text, path.relative_to(ROOT)
-        assert "TWITTER_CT0" in text, path.relative_to(ROOT)
+        assert "twitter.env" in text, path.relative_to(ROOT)
 
     twitter_guide = (
         ROOT / "agent_reach" / "guides" / "setup-twitter.md"
@@ -103,11 +102,12 @@ def test_twitter_operational_docs_explain_the_environment_boundary():
     for expected in (
         "--sync-legacy-twitter",
         "~/.agent-reach/config.yaml",
+        "~/.agent-reach/twitter.env",
         "~/.config/xfetch/session.json",
         "~/.config/bird/credentials.env",
     ):
         assert expected in twitter_guide
-    assert "默认只写" in twitter_guide
+    assert "默认只写以下" in twitter_guide
     assert "不会自动删除" in twitter_guide
 
     rendered_as_verified = (

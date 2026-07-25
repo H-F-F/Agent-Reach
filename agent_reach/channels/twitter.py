@@ -104,8 +104,7 @@ class TwitterChannel(Channel):
         return "warn", (
             "twitter-cli 已安装但没有完整的显式凭据。请用 Cookie-Editor "
             "从 x.com 导出后运行：\n"
-            "  agent-reach configure twitter-cookies "
-            "'<Cookie-Editor Header String>'\n"
+            "  agent-reach configure twitter-cookies --stdin\n"
             "Doctor 不会自动读取浏览器 Cookie。"
         )
 

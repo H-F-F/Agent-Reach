@@ -129,7 +129,7 @@ Skill이 설치된 후, 에이전트는 `agent-reach` CLI 사용 가능 여부�
 - "이 링크 읽어줘" → 모든 웹 페이지에 대해 `curl https://r.jina.ai/URL`
 - "이 GitHub 저장소는 무엇인가요?" → `gh repo view owner/repo`
 - "이 비디오는 무엇을 다루나요?" → 자막을 위해 `yt-dlp --dump-json URL`
-- "이 트윗 읽어줘" → `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` 설정 후 `twitter tweet URL`
+- "이 트윗 읽어줘" → `~/.agent-reach/twitter.env`를 불러온 후 `twitter tweet URL`
 - "이 RSS 구독해줘" → 피드 파싱을 위해 `feedparser`
 - "GitHub에서 LLM 프레임워크 검색" → `gh search repos "LLM framework"`
 
@@ -145,9 +145,9 @@ Skill이 설치된 후, 에이전트는 `agent-reach` CLI 사용 가능 여부�
 
 에이전트에 "Twitter 쿠키 설정 도와줘"라고 말하세요. Cookie-Editor 수동
 내보내기 절차를 안내합니다. 저장한 값은 `agent-reach doctor`가 명시적
-자격 증명의 존재 여부를 확인할 때만 사용하며, doctor는 `twitter status`를
-실행하지 않습니다. 직접 실행하는 `twitter` 프로세스에는
-`TWITTER_AUTH_TOKEN`과 `TWITTER_CT0`를 명시적으로 전달해야 합니다.
+자격 증명은 소유자만 읽을 수 있는 `~/.agent-reach/twitter.env`에 저장됩니다.
+직접 `twitter`를 실행하기 전에 이 파일을 불러오세요. doctor는
+`twitter status`를 실행하지 않습니다.
 
 ### 🌐 Proxy — 월 $1, 서버 전용
 
@@ -257,7 +257,7 @@ channels/
 <details>
 <summary><strong>AI 에이전트로 Twitter/X를 API 비용 없이 검색하는 방법?</strong></summary>
 
-Agent Reach는 cookie 기반 인증을 사용하는 [twitter-cli](https://github.com/public-clis/twitter-cli)를 사용합니다. Cookie-Editor로 수동 내보낸 뒤 `agent-reach configure twitter-cookies "..."`로 저장합니다. 이 값은 doctor의 설정 확인용이며 실시간 인증 성공을 뜻하지 않습니다. `twitter search "query" -n 10`을 직접 실행하는 프로세스에는 `TWITTER_AUTH_TOKEN`과 `TWITTER_CT0`를 명시적으로 전달해야 합니다.
+Agent Reach는 cookie 기반 인증을 사용하는 [twitter-cli](https://github.com/public-clis/twitter-cli)를 사용합니다. Cookie-Editor로 수동 내보낸 뒤 `agent-reach configure twitter-cookies --stdin`으로 저장합니다. 자격 증명은 `~/.agent-reach/twitter.env`에 저장되며, 이를 불러온 후 `twitter search "query" -n 10`을 실행합니다. doctor는 실시간 인증을 실행하지 않습니다.
 </details>
 
 <details>

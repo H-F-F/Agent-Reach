@@ -154,16 +154,16 @@ Some channels need credentials only the user can provide. Based on the doctor ou
 > "To unlock Twitter search, I need your Twitter cookies. Install the Cookie-Editor Chrome extension, go to x.com/twitter.com, click the extension → Export → Header String, and paste it to me."
 
 ```bash
-agent-reach configure twitter-cookies "PASTED_STRING"
+agent-reach configure twitter-cookies --stdin
+# 粘贴 Cookie-Editor Header String，然后发送 EOF（macOS/Linux: Ctrl-D）
 ```
 
-这会把 `twitter_auth_token` 和 `twitter_ct0` 保存给 Agent Reach 自己的
-`doctor` 配置检查。`doctor` 不会实时执行上游 `twitter status`，也不会修改
-当前 Shell。直接运行 `twitter search/read/...` 前，必须在该进程环境中显式设置：
+这会把 `twitter_auth_token` 和 `twitter_ct0` 保存到 Agent Reach 配置，并生成
+权限为 0600 的 `~/.agent-reach/twitter.env`。`doctor` 不会实时执行上游
+`twitter status`。直接运行 `twitter search/read/...` 前加载该文件：
 
 ```bash
-export TWITTER_AUTH_TOKEN="..."
-export TWITTER_CT0="..."
+. ~/.agent-reach/twitter.env
 twitter search "query" -n 10
 ```
 
@@ -364,7 +364,7 @@ If the user wants a different agent to handle it, let them choose.
 | `agent-reach doctor` | Show channel status |
 | `agent-reach watch` | Quick health + update check (for scheduled tasks) |
 | `agent-reach check-update` | Check for new versions |
-| `agent-reach configure twitter-cookies "..."` | 保存 Twitter Cookie 供 doctor 检查；直接调用仍需显式环境变量 |
+| `agent-reach configure twitter-cookies --stdin` | 安全读取 Twitter Cookie，生成私密 `twitter.env` |
 | `agent-reach configure proxy URL` | 保存代理地址（Agent 访问 Reddit/Twitter 等受限网络时读取它设置 HTTP_PROXY/HTTPS_PROXY，不是自动解锁开关） |
 | `agent-reach configure groq-key gsk_xxx` | Unlock Xiaoyuzhou podcast transcription |
 
@@ -372,7 +372,7 @@ After installation, use upstream tools directly. See SKILL.md for the full comma
 
 | Platform | Upstream Tool | Example |
 |----------|--------------|---------|
-| Twitter/X | `twitter`（备选 `opencli`） | 设置 `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` 后运行 `twitter search "query" -n 10` |
+| Twitter/X | `twitter`（备选 `opencli`） | `. ~/.agent-reach/twitter.env` 后运行 `twitter search "query" -n 10` |
 | YouTube | `yt-dlp` | `yt-dlp --dump-json URL` |
 | Bilibili | `bili`（字幕走 `opencli`） | `bili search "query" --type video` / `opencli bilibili subtitle BVxxx` |
 | Reddit | `opencli`（备选 `rdt`） | `opencli reddit search "query" -f yaml` / `rdt read POST_ID` |

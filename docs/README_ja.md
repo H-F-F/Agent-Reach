@@ -129,7 +129,7 @@ Skillインストール後、エージェントは`agent-reach` CLIが利用可�
 - 「このリンクを読んで」→ `curl https://r.jina.ai/URL` で任意のWebページ
 - 「このGitHubリポジトリは何？」→ `gh repo view owner/repo`
 - 「この動画の内容は？」→ `yt-dlp --dump-json URL` で字幕取得
-- 「このツイートを読んで」→ `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` を設定してから `twitter tweet URL`
+- 「このツイートを読んで」→ `~/.agent-reach/twitter.env` を読み込んでから `twitter tweet URL`
 - 「このRSSを購読して」→ `feedparser` でフィード解析
 - 「GitHubでLLMフレームワークを検索して」→ `gh search repos "LLM framework"`
 
@@ -145,9 +145,9 @@ Skillインストール後、エージェントは`agent-reach` CLIが利用可�
 
 エージェントに「Twitterのクッキーの設定を手伝って」と伝えてください —
 Cookie-Editor による手動エクスポートを案内します。保存した値は
-`agent-reach doctor` が設定の有無を確認するためだけに使われ、doctor は
-`twitter status` を実行しません。上流の `twitter` コマンドには
-`TWITTER_AUTH_TOKEN` と `TWITTER_CT0` を明示的に設定してください。
+資格情報は所有者だけが読める `~/.agent-reach/twitter.env` に保存されます。
+上流の `twitter` コマンドの前にこのファイルを読み込んでください。
+doctor は `twitter status` を実行しません。
 
 ### 🌐 プロキシ — 月額$1、サーバーのみ
 
@@ -256,7 +256,7 @@ channels/
 <details>
 <summary><strong>Twitter/X APIに課金せずにAIエージェントで検索するには？</strong></summary>
 
-Agent Reach は [twitter-cli](https://github.com/public-clis/twitter-cli) をCookie認証で使用します。Cookie-Editor で手動エクスポートし、`agent-reach configure twitter-cookies "your_cookies"` で Agent Reach に保存します。これは doctor の設定確認用であり、doctor は上流の認証をリアルタイム検証しません。`twitter search "query" -n 10` を直接実行するプロセスには `TWITTER_AUTH_TOKEN` と `TWITTER_CT0` を明示的に渡してください。
+Agent Reach は [twitter-cli](https://github.com/public-clis/twitter-cli) をCookie認証で使用します。Cookie-Editor で手動エクスポートし、`agent-reach configure twitter-cookies --stdin` で保存します。資格情報は `~/.agent-reach/twitter.env` に保存されます。これを読み込んでから `twitter search "query" -n 10` を実行してください。doctor は上流の認証をリアルタイム検証しません。
 </details>
 
 <details>

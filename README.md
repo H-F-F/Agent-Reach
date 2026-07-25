@@ -94,7 +94,9 @@ AI Agent 已经能帮你写代码、改文档、管项目——但你让它去�
 >
 > 🍪 Twitter 只接受用户通过 Cookie-Editor 手工导出的内容。Agent Reach 不替用户执行小红书登录，也不读取小红书浏览器 Cookie；OpenCLI 只使用用户已经存在且明确控制的 Chrome 会话。`agent-reach configure xhs-cookies` 不会把 Cookie 注入 OpenCLI / Chrome；没有现成会话时，改用 Cookie-Editor 导出后配置 xiaohongshu-mcp / 存量工具。
 >
-> Twitter Cookie 保存后仅供 `agent-reach doctor` 检查配置是否齐全；直接运行上游 `twitter` 命令前，仍需在当前进程环境中显式设置 `TWITTER_AUTH_TOKEN` 和 `TWITTER_CT0`。
+> Twitter Cookie 会写入私密的 `~/.agent-reach/twitter.env`。直接运行上游
+> `twitter` 前先执行 `. ~/.agent-reach/twitter.env`；`doctor` 只检查配置，
+> 不会触发上游的浏览器 Cookie 回退。
 >
 > 🔒 Cookie 只存在你本地，不上传不外传。代码完全开源，随时可审查。
 > 💻 本地电脑不需要代理。代理只有部署在服务器上才需要（~$1/月）。

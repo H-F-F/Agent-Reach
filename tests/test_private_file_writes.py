@@ -459,3 +459,101 @@ def test_install_is_safe_by_default(isolated_home, monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "SAFE MODE" in output
     assert "No changes were made" in output
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_twitter_configure_writes_sourceable_private_env(
+    isolated_home, monkeypatch, capsys
+):
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+
+    cli._cmd_configure(
+        Namespace(
+            from_browser=None,
+            key="twitter-cookies",
+            value=["auth-value", "ct0-value"],
+            stdin=False,
+            sync_legacy_twitter=False,
+        )
+    )
+
+    env_path = isolated_home / ".agent-reach" / "twitter.env"
+    assert env_path.read_text(encoding="utf-8") == (
+        "export TWITTER_AUTH_TOKEN=auth-value\n"
+        "export TWITTER_CT0=ct0-value\n"
+    )
+    assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
+
+    output = capsys.readouterr().out
+    assert "auth-value" not in output
+    assert "ct0-value" not in output
+    assert ". ~/.agent-reach/twitter.env" in output
+
+
+def test_twitter_configure_fails_closed_on_env_symlink(
+    isolated_home, monkeypatch, capsys
+):
+    config_dir = isolated_home / ".agent-reach"
+    config_dir.mkdir(mode=0o700)
+    env_path = config_dir / "twitter.env"
+    victim = isolated_home / "victim.env"
+    victim.write_text("KEEP=unchanged\n", encoding="utf-8")
+    try:
+        env_path.symlink_to(victim)
+    except OSError:
+        pytest.skip("symlinks are not supported on this platform")
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+
+    with pytest.raises(SystemExit) as exc:
+        cli._cmd_configure(
+            Namespace(
+                from_browser=None,
+                key="twitter-cookies",
+                value=["secret-auth", "secret-ct0"],
+                stdin=False,
+                sync_legacy_twitter=False,
+            )
+        )
+
+    assert exc.value.code == 1
+    assert victim.read_text(encoding="utf-8") == "KEEP=unchanged\n"
+    error = capsys.readouterr().err
+    assert "could not write" in error
+    assert "secret-auth" not in error
+    assert "secret-ct0" not in error
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX shell source semantics")
+def test_twitter_env_quotes_shell_metacharacters(
+    isolated_home, monkeypatch
+):
+    victim = isolated_home / "must-not-exist"
+    auth_token = f"auth$(touch${{IFS}}{victim})"
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+
+    cli._cmd_configure(
+        Namespace(
+            from_browser=None,
+            key="twitter-cookies",
+            value=[f"auth_token={auth_token};", "ct0=ct0-value"],
+            stdin=False,
+            sync_legacy_twitter=False,
+        )
+    )
+
+    env_path = isolated_home / ".agent-reach" / "twitter.env"
+    result = subprocess.run(
+        [
+            "/bin/sh",
+            "-c",
+            '. "$1"; printf "%s\\n%s" "$TWITTER_AUTH_TOKEN" "$TWITTER_CT0"',
+            "sh",
+            str(env_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout == f"{auth_token}\nct0-value"
+    assert not victim.exists()

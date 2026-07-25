@@ -5,7 +5,7 @@ Agent Reach CLI — installer, doctor, and configuration tool.
 Usage:
     agent-reach install --env=auto
     agent-reach doctor
-    agent-reach configure twitter-cookies "auth_token=xxx; ct0=yyy"
+    agent-reach configure twitter-cookies --stdin
     agent-reach setup
 """
 
@@ -94,6 +94,11 @@ def main():
                                  "xhs-cookies"],
                         help="What to configure (omit if using --from-browser)")
     p_conf.add_argument("value", nargs="*", help="The value(s) to set")
+    p_conf.add_argument(
+        "--stdin",
+        action="store_true",
+        help="Read the value from standard input instead of command arguments",
+    )
     p_conf.add_argument("--from-browser", metavar="BROWSER",
                         choices=["chrome", "firefox", "edge", "brave", "opera"],
                         help="Extract cookies for one explicitly selected platform")
@@ -156,6 +161,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "configure" and args.from_browser:
+        if args.stdin:
+            p_conf.error("--stdin cannot be combined with --from-browser")
         if not args.platform:
             p_conf.error("--platform is required with --from-browser")
         manual_keys = {
@@ -174,6 +181,8 @@ def main():
         if args.sync_legacy_twitter:
             p_conf.error("--sync-legacy-twitter is only valid with twitter-cookies")
     elif args.command == "configure":
+        if args.stdin and args.value:
+            p_conf.error("--stdin cannot be combined with a positional value")
         if args.profile or args.platform:
             p_conf.error("--platform/--profile require --from-browser")
         if args.sync_legacy_twitter and args.key != "twitter-cookies":
@@ -353,8 +362,7 @@ def _cmd_install(args):
         for channel in sorted(requested_channels & COOKIE_CHANNELS):
             if channel == "twitter":
                 print(
-                    "  agent-reach configure twitter-cookies "
-                    "'<Cookie-Editor Header String>'"
+                    "  agent-reach configure twitter-cookies --stdin"
                 )
             elif channel == "xiaohongshu":
                 print(
@@ -1194,7 +1202,15 @@ def _cmd_configure(args):
         )
         return
 
-    value = " ".join(args.value) if args.value else ""
+    if getattr(args, "stdin", False):
+        max_stdin_bytes = 1024 * 1024
+        value = sys.stdin.read(max_stdin_bytes + 1)
+        if len(value.encode("utf-8")) > max_stdin_bytes:
+            print("Configuration input exceeds 1 MiB limit", file=sys.stderr)
+            raise SystemExit(1)
+        value = value.strip()
+    else:
+        value = " ".join(args.value) if args.value else ""
     if not value:
         print(f"Missing value for {args.key}")
         raise SystemExit(1)
@@ -1216,10 +1232,27 @@ def _cmd_configure(args):
         auth_token, ct0 = _parse_twitter_cookie_input(value)
 
         if auth_token and ct0:
+            from agent_reach.utils.paths import PrivatePathError
+
             config.set("twitter_auth_token", auth_token)
             config.set("twitter_ct0", ct0)
+            try:
+                _write_twitter_env(auth_token, ct0)
+            except (OSError, ValueError, PrivatePathError) as exc:
+                from agent_reach.utils.text import scrub_url_credentials
 
-            print("✅ Twitter cookies 已保存到 ~/.agent-reach/config.yaml")
+                print(
+                    "agent-reach configure: error: could not write "
+                    f"~/.agent-reach/twitter.env: {scrub_url_credentials(exc)}",
+                    file=sys.stderr,
+                )
+                raise SystemExit(1) from None
+
+            print(
+                "✅ Twitter cookies 已保存到 ~/.agent-reach/config.yaml "
+                "和 ~/.agent-reach/twitter.env"
+            )
+            print("  当前 Shell 加载：. ~/.agent-reach/twitter.env")
             if getattr(args, "sync_legacy_twitter", False):
                 from agent_reach.cookie_extract import (
                     _sync_bird_env,
@@ -1258,8 +1291,11 @@ def _cmd_configure(args):
         else:
             print("[X] Could not find auth_token and ct0 in your input.")
             print("   Accepted formats:")
-            print("   1. agent-reach configure twitter-cookies AUTH_TOKEN CT0")
-            print('   2. agent-reach configure twitter-cookies "auth_token=xxx; ct0=yyy; ..."')
+            print(
+                "   Recommended: agent-reach configure "
+                "twitter-cookies --stdin"
+            )
+            print("   Then paste a Cookie-Editor Header String and send EOF.")
             raise SystemExit(1)
 
     elif args.key == "youtube-cookies":
@@ -1323,6 +1359,21 @@ def _parse_twitter_cookie_input(value: str):
         ct0 = parts[1]
 
     return auth_token, ct0
+
+
+def _write_twitter_env(auth_token: str, ct0: str):
+    """Write a sourceable owner-only environment file for twitter-cli."""
+    import shlex
+    from pathlib import Path
+
+    from agent_reach.utils.paths import atomic_write_private_text
+
+    env_path = Path.home() / ".agent-reach" / "twitter.env"
+    payload = (
+        f"export TWITTER_AUTH_TOKEN={shlex.quote(auth_token)}\n"
+        f"export TWITTER_CT0={shlex.quote(ct0)}\n"
+    )
+    return atomic_write_private_text(env_path, payload)
 
 
 def _configure_xhs_cookies(value) -> bool:
