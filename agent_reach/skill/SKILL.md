@@ -53,6 +53,7 @@ metadata:
 | 网页/文章/RSS | web | [references/web.md](references/web.md) |
 | YouTube/B站/播客字幕 | video | [references/video.md](references/video.md) |
 | 雪球/股票行情 | finance | [references/finance.md](references/finance.md) |
+| ArXiv 学术论文搜索 | search | 零配置，见下方快速命令 |
 
 ## 零配置快速命令
 
@@ -74,6 +75,9 @@ curl -s "https://www.v2ex.com/api/topics/hot.json" -H "User-Agent: agent-reach/1
 
 # B站搜索（bili-cli，无需登录）
 bili search "query" --type video -n 5
+
+# ArXiv 学术论文搜索（zero-config）
+curl -s "https://export.arxiv.org/api/query?search_query=all:transformer&start=0&max_results=5"
 ```
 
 ## 需登录态的平台（按 doctor 的 active_backend 选命令）

@@ -144,7 +144,7 @@ class ArxivChannel(Channel):
         if "arxiv.org/abs/" in arxiv_id:
             arxiv_id = arxiv_id.split("/abs/")[-1].split("v")[0]
         elif "arxiv.org/pdf/" in arxiv_id:
-            arxiv_id = arxiv_id.split("/pdf/")[-1].split("v")[0]
+            arxiv_id = arxiv_id.split("/pdf/")[-1].replace(".pdf", "").split("v")[0]
 
         # Use id_list parameter for precise lookup
         xml_text = _fetch(f"id_list={quote(arxiv_id)}")

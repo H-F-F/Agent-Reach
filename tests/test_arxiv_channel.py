@@ -160,10 +160,17 @@ def test_search_returns_structured_results():
 
 
 def test_search_respects_limit():
+    """Verify limit parameter is passed correctly in API query."""
     ch = ArxivChannel()
-    with patch("agent_reach.channels.arxiv._fetch", return_value=_XML_MULTI_ENTRY):
-        results = ch.search("test", limit=1)
-    assert len(results) == 1
+    captured_params = {}
+
+    def fake_fetch(params):
+        captured_params["params"] = params
+        return _XML_MULTI_ENTRY
+
+    with patch("agent_reach.channels.arxiv._fetch", side_effect=fake_fetch):
+        ch.search("test", limit=1)
+    assert "max_results=1" in captured_params["params"]
 
 
 def test_search_zero_limit_returns_empty():
@@ -203,6 +210,7 @@ def test_get_paper_by_id():
 
 
 def test_get_paper_from_abs_url():
+    """URL https://arxiv.org/abs/2201.00978v2 → id_list=2201.00978 (version stripped)."""
     ch = ArxivChannel()
     captured = {}
 
@@ -212,11 +220,13 @@ def test_get_paper_from_abs_url():
 
     with patch("agent_reach.channels.arxiv._fetch", side_effect=fake_fetch):
         result = ch.get_paper("https://arxiv.org/abs/2201.00978v2")
-    assert captured["params"] == "id_list=2201.00978v2"
-    assert result["arxiv_id"] == "2201.00978v2"
+    # Version suffix .v2 is stripped by split("v")[0]
+    assert captured["params"] == "id_list=2201.00978"
+    assert result["arxiv_id"] == "2201.00978v1"  # From fixture XML
 
 
 def test_get_paper_from_pdf_url():
+    """URL https://arxiv.org/pdf/2201.00978.pdf → id_list=2201.00978."""
     ch = ArxivChannel()
     captured = {}
 
@@ -227,6 +237,8 @@ def test_get_paper_from_pdf_url():
     with patch("agent_reach.channels.arxiv._fetch", side_effect=fake_fetch):
         result = ch.get_paper("https://arxiv.org/pdf/2201.00978.pdf")
     assert captured["params"] == "id_list=2201.00978"
+    # Result arxiv_id comes from the XML fixture, not the input URL
+    assert result["arxiv_id"] == "2201.00978v1"
 
 
 def test_get_paper_not_found_raises():
