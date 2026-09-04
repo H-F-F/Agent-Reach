@@ -6,6 +6,7 @@ Channel registry — lists all supported platforms for doctor checks.
 from typing import List, Optional
 
 # Import all channels
+from .arxiv import ArxivChannel
 from .base import Channel
 from .bilibili import BilibiliChannel
 from .exa_search import ExaSearchChannel
@@ -39,6 +40,7 @@ ALL_CHANNELS: List[Channel] = [
     RSSChannel(),
     ExaSearchChannel(),
     WebChannel(),
+    ArxivChannel(),
 ]
 
 
