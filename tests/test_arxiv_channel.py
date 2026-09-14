@@ -10,7 +10,13 @@ from unittest.mock import patch
 
 import pytest
 
-from agent_reach.channels.arxiv import ArxivChannel, _fetch, _parse_entries, _quote_query
+from agent_reach.channels.arxiv import (
+    ArxivChannel,
+    ArxivRateLimitError,
+    _fetch,
+    _parse_entries,
+    _quote_query,
+)
 
 # --- Sample XML fixtures ---
 
@@ -105,6 +111,36 @@ def test_check_warn_on_empty_response():
     assert "无响应" in message
 
 
+def test_check_warn_on_rate_limit_not_proxy():
+    """HTTP 429 must be reported as rate limiting, not as a proxy failure."""
+    ch = ArxivChannel()
+    ch.active_backend = "stale"
+    with patch(
+        "agent_reach.channels.arxiv._fetch",
+        side_effect=ArxivRateLimitError("请求过于频繁（限流），请间隔至少 3 秒后重试"),
+    ):
+        status, message = ch.check()
+    assert status == "warn"
+    assert "过于频繁" in message
+    assert "代理" not in message
+    assert ch.active_backend is None
+
+
+def test_fetch_raises_rate_limit_on_http_429():
+    """A raw HTTP 429 from the API must surface as ArxivRateLimitError."""
+    import urllib.error
+
+    http_err = urllib.error.HTTPError(
+        "https://export.arxiv.org/api/query", 429, "Too Many Requests", {}, None
+    )
+    with patch(
+        "agent_reach.channels.arxiv.urllib.request.urlopen",
+        side_effect=http_err,
+    ):
+        with pytest.raises(ArxivRateLimitError, match="过于频繁"):
+            _fetch("search_query=test")
+
+
 # --- _parse_entries ---
 
 def test_parse_entries_maps_fields_correctly():
@@ -147,6 +183,12 @@ def test_parse_entries_truncates_long_summary():
 </feed>"""
     entries = _parse_entries(xml)
     assert len(entries[0]["summary"]) == 500
+
+
+def test_parse_entries_invalid_xml_raises_clear_error():
+    """A non-XML API response must raise a clear ValueError, not ET.ParseError."""
+    with pytest.raises(ValueError, match="无法解析"):
+        _parse_entries("<not-xml>")
 
 
 # --- search() ---
@@ -197,6 +239,21 @@ def test_search_capped_at_100():
     with patch("agent_reach.channels.arxiv._fetch", side_effect=fake_fetch):
         ch.search("test", limit=200)
     assert "max_results=100" in captured_params["params"]
+
+
+def test_search_preserves_field_prefix_syntax():
+    """Queries with an explicit ArXiv field prefix must not get 'all:' added."""
+    ch = ArxivChannel()
+    captured = {}
+
+    def fake_fetch(params):
+        captured["params"] = params
+        return _XML_SINGLE_ENTRY
+
+    with patch("agent_reach.channels.arxiv._fetch", side_effect=fake_fetch):
+        ch.search("au:Smith", limit=1)
+    assert "search_query=au:Smith" in captured["params"]
+    assert "all:" not in captured["params"]
 
 
 # --- get_paper() ---

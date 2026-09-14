@@ -78,6 +78,7 @@ bili search "query" --type video -n 5
 
 # ArXiv 学术论文搜索（zero-config）
 curl -s "https://export.arxiv.org/api/query?search_query=all:transformer&start=0&max_results=5"
+# 注意：ArXiv 官方限流约每 3 秒 1 个请求，连续调用请加间隔（429 即限流）
 ```
 
 ## 需登录态的平台（按 doctor 的 active_backend 选命令）
